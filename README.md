@@ -137,7 +137,6 @@ Logistic regression on per-head bbox attention ratios (28 layers x 16 heads = 44
 - Probe score ↔ correctness: r=0.636
 - Mean predict_proba: positives=0.83, negatives=0.32
 
-The bbox overlap probe has perfect AUROC (trivially predicts attention-in-bbox from attention features) but zero correlation with correctness — a pure spatial signal with no correctness leakage.
 
 ## Reproduction
 
