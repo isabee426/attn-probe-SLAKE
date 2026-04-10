@@ -1,0 +1,45 @@
+# Spatial GRPO on SLAKE organ-specific questions only
+# 10/1 train/val split, no union bbox fallback
+# α=0.7: 70% correctness + 30% spatial grounding
+model:
+  name_or_path: "Qwen/Qwen3-VL-2B-Thinking"
+  dtype: "bfloat16"
+  device: "cuda"
+  use_lora: true
+  lora:
+    r: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+
+# Spatial grounding probe (trained on SLAKE organ bboxes)
+use_lookback_lens: true
+spatial_classifier: "checkpoints/spatial_grounding/spatial_classifier.pkl"
+slake_dir: "/data3/ishaplan/slake_full/Slake1.0"
+
+grpo:
+  num_rollouts: 8
+  reward_alpha: 0.7
+  clip_eps: 0.2
+  kl_beta: 0.05
+  temperature: 1.0
+  max_new_tokens: 512
+  epochs: 1
+  grad_accum_steps: 8
+  log_every: 10
+  ebpo_shrinkage: true
+
+training:
+  learning_rate: 1.0e-5
+  weight_decay: 0.01
+  cosine_lr: true
+  save_every_steps: 10
+  checkpoint_dir: "checkpoints/spatial_grpo_organonly/a07_seed42/"
+
+data:
+  datasets: ["slake"]
+  image_cache_dir: "data/images"
+  organ_only: true      # Filter to questions with organ bbox match (~24%)
+  train_val_ratio: 10   # 10/1 split on filtered set — ~1200 train / ~120 val
+
+seed: 42

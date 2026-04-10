@@ -1,0 +1,43 @@
+# Correctness-only GRPO baseline — seed 123 for reproducibility
+model:
+  name_or_path: "Qwen/Qwen3-VL-2B-Thinking"
+  dtype: "bfloat16"
+  device: "cuda"
+  use_lora: true
+  lora:
+    r: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]
+
+slake_dir: "/data3/ishaplan/slake_full/Slake1.0"
+spatial_classifier: "/data3/ishaplan/slake_reproduction/checkpoints/spatial_probe_corrlabels/spatial_classifier.pkl"
+use_lookback_lens: true
+
+grpo:
+  num_rollouts: 8
+  reward_alpha: 1.0
+  clip_eps: 0.2
+  kl_beta: 0.05
+  temperature: 1.0
+  max_new_tokens: 512
+  epochs: 1
+  grad_accum_steps: 8
+  log_every: 10
+  ebpo_shrinkage: true
+  drop_unformatted: true
+
+training:
+  learning_rate: 1.0e-5
+  weight_decay: 0.01
+  cosine_lr: true
+  save_every_steps: 10
+  checkpoint_dir: "/data3/ishaplan/slake_reproduction/checkpoints/correctness_only/seed123/"
+
+data:
+  datasets: ["slake"]
+  image_cache_dir: "data/images"
+  organ_only: true
+  train_val_ratio: 10
+
+seed: 123
