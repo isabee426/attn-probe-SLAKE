@@ -74,11 +74,6 @@ Training faith is higher and varies more for spatial (0.34-0.42) vs correctness-
 
 ### Scores
 
-| Model | Accuracy (binary) | Accuracy (token F1) |
-|-------|-------------------|---------------------|
-| Zero-shot | 21/30 (70%) | 22/30 (73%) |
-| Correctness-only | 20/30 (67%) | 20/30 (67%) |
-| Spatial alpha=0.7 | 19/30 (63%) | 21/30 (70%) |
 
 All three models produced near-identical outputs on **23/30 questions**. Differences concentrate in 7 questions.
 
