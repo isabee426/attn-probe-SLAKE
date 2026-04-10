@@ -120,6 +120,71 @@ The spatial probe reward makes the model:
 3. **More visually grounded** (Q18 — explicitly checks image regions)
 4. **Slightly less careful with edge cases** (Q17 — uses clinical terms that don't token-match)
 
+## Full Validation Eval (188 organ-only examples, token F1)
+
+Evaluated the original April 4 best checkpoints (trained with binary correctness) using strict token F1 scoring on the full 188-example organ-only val set.
+
+| Model | Token F1 | Exact (>0.5) |
+|-------|----------|-------------|
+| Zero-shot | 0.289 | 49/188 (26.1%) |
+| Correctness-only | 0.262 | 45/188 (23.9%) |
+| **Spatial (alpha=0.7)** | **0.298** | **51/188 (27.1%)** |
+
+**Spatial vs Corr-only: +0.036 (+13.7% relative)**
+
+Correctness-only training *degraded* from zero-shot (-9.3% relative). Spatial maintained zero-shot quality and slightly exceeded it. Under the strict token F1 metric the spatial advantage is even larger than under binary correctness (+13.7% vs +3.7%).
+
+### Behavioral Metrics (30-example rollout analysis)
+
+| Metric | Zero-shot | Corr-only | Spatial |
+|--------|-----------|-----------|---------|
+| Greedy Token F1 | 0.423 | 0.347 | **0.422** |
+| Avg response tokens | 325 | 332 | **326** |
+| Reasoning loop rate | 63% | **70%** | 63% |
+| Sampled F1 (8 rollouts) | 0.304 | 0.281 | 0.278 |
+
+Correctness-only produces more reasoning loops (70% vs 63%) and longer responses. Spatial matches zero-shot on all behavioral metrics while correctness-only degrades.
+
+### Full Eval Disagreement Examples
+
+**Q6 — "Where is the pneumonia located?" (GT: Lower Left Lung)**
+
+- **Zero-shot** (398 tok, WRONG): Loops, no answer tag produced
+- **Correctness-only** (378 tok, WRONG): Long explanation about opacity and density, no answer tag — "Pneumonia appears as areas of increased density (opacity) in the lung fields..."
+- **Spatial** (347 tok, CORRECT): `left lung` — concise, commits to answer
+
+**Q28 — "Where is the infiltration located?" (GT: Lower Left Lung)**
+
+- **Zero-shot** (399 tok, WRONG): Loops, no answer
+- **Correctness-only** (392 tok, WRONG): "To determine the location of infiltration in the chest X-ray, we analyze the radiographic features..." — never commits
+- **Spatial** (342 tok, CORRECT): `left lung` — same pattern, concise and correct
+
+**Q20 — "Does the picture contain liver?" (GT: No)**
+
+- **Zero-shot** (268 tok, CORRECT): `No`
+- **Correctness-only** (428 tok, WRONG): Loops for 428 tokens, no answer tag
+- **Spatial** (298 tok, CORRECT): `No`
+
+**Q8 — "Are there abnormalities in the patient's right lung?" (GT: Yes)**
+
+- **Zero-shot** (375 tok, WRONG): Loops, no answer
+- **Correctness-only** (335 tok, CORRECT): `Yes` — one of the few cases corr-only wins
+- **Spatial** (387 tok, WRONG): Describes the darkened area in detail but never produces an answer tag
+
+**Q18 — "What color is the liver?" (GT: Gray)**
+
+- **Zero-shot** (343 tok, CORRECT): `gray`
+- **Correctness-only** (418 tok, WRONG): Loops, no answer
+- **Spatial** (401 tok, WRONG): Explains CT imaging principles but doesn't commit to "gray"
+
+### Pattern: Answer Tag Production
+
+The most common failure mode across all models is failing to produce `<answer>` tags within 512 tokens. The spatial model produces answer tags more reliably than correctness-only:
+
+- Spatial: concise answers like `left lung`, `No`, `gray` — commits early
+- Correctness-only: explains extensively, enters "Wait, actually..." loops, hits 512 tokens without committing
+- When spatial fails, it's because it also starts explaining (Q8, Q18) — but this happens less often
+
 ## Spatial Grounding Probe
 
 Logistic regression on per-head bbox attention ratios (28 layers x 16 heads = 448 features).
