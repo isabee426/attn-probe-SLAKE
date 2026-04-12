@@ -1,6 +1,6 @@
 # Spatial Attention Probe as Auxiliary Reward for Medical VQA GRPO
 
-Training a spatial grounding probe on organ bounding box attention patterns, then using it as a secondary reward signal during GRPO to improve medical VQA accuracy on SLAKE.
+Training a spatial grounding probe on organ bounding box attention patterns to differentiate correct and incorrect attention patterns, then using it as a secondary reward signal during GRPO to improve medical VQA accuracy on SLAKE.
 
 ## Most Recent GRPO Run (30-example rollout analysis, epoch 1 checkpoints)
 
