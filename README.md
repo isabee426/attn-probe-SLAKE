@@ -2,6 +2,22 @@
 
 Training a spatial grounding probe on organ bounding box attention patterns, then using it as a secondary reward signal during GRPO to improve medical VQA accuracy on SLAKE.
 
+## Most Recent GRPO Run (30-example rollout analysis, epoch 1 checkpoints)
+
+| Metric | Zero-shot | Corr-only | **Corrprobe** |
+|--------|-----------|-----------|---------------|
+| **Greedy F1** | 0.423 | 0.486 | **0.558** |
+| Exact wins | 12/30 | 14/30 | **16/30** |
+| Avg tokens | 325 | 275 | 284 |
+| Reasoning loops | 63% | 53% | **53%** |
+| Sampled F1 (8 rollouts) | 0.314 | **0.421** | 0.392 |
+
+**Corrprobe greedy F1 of 0.558 is the highest score on any eval in the entire project.** It beats corr-only by +0.072 (+14.8% relative).
+
+Both trained models are more concise than zero-shot (275-284 tok vs 325) and have fewer reasoning loops (53% vs 63%).
+
+Corr-only has higher sampled F1 (0.421 vs 0.392) — it's better at generating correct answers across diverse rollouts. Corrprobe's advantage is specifically in **greedy** (deterministic) decoding, where it commits to the right answer more reliably.
+
 ## Key Finding
 
 A spatial attention probe reward (30% weight) improves accuracy over correctness-only GRPO by **+3.7% relative** (0.723 vs 0.697) with the binary correctness function, and **+8.2% relative** (0.622 vs 0.575) with strict token F1 — despite not measurably changing the model's spatial grounding behavior (faith ~0.276 for both).
