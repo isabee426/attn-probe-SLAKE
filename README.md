@@ -2,7 +2,7 @@
 
 Training a spatial grounding probe on organ bounding box attention patterns to differentiate correct and incorrect attention patterns, then using it as a secondary reward signal during GRPO to improve medical VQA accuracy on SLAKE.
 
-## Latest Results (30-example rollout analysis, epoch 1 checkpoints)
+## Latest Results (30-example rollout analysis, peak checkpoints)
 
 | Metric | Zero-shot | Corr-only | **Corrprobe** |
 |--------|-----------|-----------|---------------|
