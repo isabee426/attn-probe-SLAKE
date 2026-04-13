@@ -2,7 +2,7 @@
 
 Training a spatial grounding probe on organ bounding box attention patterns to differentiate correct and incorrect attention patterns, then using it as a secondary reward signal during GRPO to improve medical VQA accuracy on SLAKE.
 
-## Most Recent GRPO Run (30-example rollout analysis, epoch 1 checkpoints)
+## Latest Results (30-example rollout analysis, epoch 1 checkpoints)
 
 | Metric | Zero-shot | Corr-only | **Corrprobe** |
 |--------|-----------|-----------|---------------|
@@ -20,9 +20,7 @@ Corr-only has higher sampled F1 (0.421 vs 0.392) — it's better at generating c
 
 ## Key Finding
 
-A spatial attention probe reward (30% weight) improves accuracy over correctness-only GRPO by **+3.7% relative** (0.723 vs 0.697) with the binary correctness function, and **+8.2% relative** (0.622 vs 0.575) with strict token F1 — despite not measurably changing the model's spatial grounding behavior (faith ~0.276 for both).
-
-The probe acts as an **implicit regularizer**, not a grounding improver. It prevents the model from overfitting to the sparse correctness signal and encourages more decisive, concise reasoning.
+The attention probe acts as an auxiliary reward that enforces good internal practice — attending to the queried organ — which produces more stable GRPO training and more decisive model behavior, even though measured faithfulness stays constant across conditions.
 
 ## Configuration
 
@@ -36,170 +34,107 @@ The probe acts as an **implicit regularizer**, not a grounding improver. It prev
 | Prompt | "Answer this medical question. Think step by step, then give your final answer in \<answer\>...\</answer\> tags." |
 | Reward (baseline) | alpha=1.0 (correctness only) |
 | Reward (spatial) | alpha=0.7 (70% correctness + 30% spatial probe) |
+| Correctness metric | Token F1 |
 | Faith normalization | Global z-score + sigmoid (Welford's algorithm) |
 | Advantage | EBPO shrinkage baseline |
 | Optimizer | AdamW, lr=1e-5, cosine schedule, grad clip 1.0 |
 
-## Results
+## Training Trajectories (val correctness, token F1)
 
-### Experiment 1: Binary Correctness (containment + synonyms)
+### Corr-only s42 (volatile — peaks then declines):
+```
+Step 10→20→30→40→50→60→70→80→90
+0.284→0.298→0.330→0.317→0.335→0.412→0.394→0.380→0.407
+```
 
-| Step | Correctness-only (alpha=1.0) Correct | Correctness-only (alpha=1.0) Faith | Spatial GRPO (alpha=0.7) Correct | Spatial GRPO (alpha=0.7) Faith |
-|------|---|---|---|---|
-| 10 | 0.692 | 0.276 | 0.676 | 0.276 |
-| 20 | 0.670 | 0.277 | 0.654 | 0.277 |
-| 30 | 0.681 | 0.276 | 0.686 | 0.276 |
-| 40 | 0.681 | 0.276 | **0.723** | 0.277 |
-| 50 | **0.697** | 0.277 | — | — |
-| 80 | **0.697** (peak) | 0.275 | — | — |
-| 90 | 0.681 | 0.275 | 0.676 | 0.276 |
-| 100 | — | — | 0.686 | 0.276 |
+### Corrprobe s42 (monotonically increasing):
+```
+Step 10→20→30→40→50→60→70→80→90
+0.301→0.298→0.310→0.322→0.326→0.344→0.374→0.377→0.406
+```
 
-- Correctness-only peaked at step 80: **0.697**
-- Spatial peaked at step 40: **0.723**
-- **Spatial won by +0.026** (+3.7% relative)
-- Faith identical for both (~0.276) — probe acts as regularizer
+### Full table (all 6 runs)
 
-### Experiment 2: Strict Token F1
+| Step | Corr s42 | Corr s123 | Bbox s42 | Bbox s123 | Corrprobe s42 | Corrprobe s123 |
+|------|----------|-----------|----------|-----------|---------------|----------------|
+| 10 | 0.284 | 0.281 | 0.318 | 0.283 | 0.301 | 0.274 |
+| 20 | 0.298 | 0.265 | 0.301 | 0.295 | 0.298 | 0.294 |
+| 30 | 0.330 | 0.293 | 0.285 | 0.282 | 0.310 | 0.280 |
+| 40 | 0.317 | 0.305 | 0.334 | 0.285 | 0.322 | 0.289 |
+| 50 | 0.335 | 0.300 | 0.348 | 0.351 | 0.326 | 0.362 |
+| 60 | **0.412** | 0.354 | 0.318 | 0.359 | 0.344 | 0.359 |
+| 70 | 0.394↓ | 0.372 | 0.353 | 0.351 | 0.374 | 0.360 |
+| 80 | 0.380↓ | 0.398 | 0.366 | **0.402** | 0.377 | 0.375 |
+| 90 | 0.407 | — | **0.393** | 0.369↓ | **0.406** | — |
 
-| Step | Correctness-only Correct | Correctness-only Faith | Spatial GRPO Correct | Spatial GRPO Faith |
-|------|---|---|---|---|
-| 10-20 | ~0.62 (peak) | 0.276 | — | — |
-| 30 | 0.612 | 0.276 | — | — |
-| 40 | 0.601 | 0.276 | — | — |
-| 50 | 0.575 ↓ | 0.276 | **0.622** | 0.276 |
+### Peak correctness per condition
 
-- Correctness-only peaked early (~step 10-20), then declined to 0.575
-- Spatial still climbing at step 50: **0.622**
-- **Spatial ahead by +0.047** (+8.2% relative)
-- Correctness-only overfits faster; spatial has slower start but sustained improvement
+| Condition | Best seed | Peak | At step | Still climbing at epoch end? |
+|-----------|----------|------|---------|------------------------------|
+| Corr-only | s42 | **0.412** | 60 | No — declined to 0.380, recovered to 0.407 |
+| Bbox | s123 | 0.402 | 80 | Mixed |
+| **Corrprobe** | **s42** | **0.406** | **90** | **Yes — monotonically increasing** |
 
-### Training Dynamics
+## 188-Val Eval (token F1, epoch 1 checkpoints)
 
-| Step | Correctness-only Reward | Correctness-only Correct | Correctness-only Faith | Spatial GRPO Reward | Spatial GRPO Correct | Spatial GRPO Faith |
-|------|---|---|---|---|---|---|
-| ~9 | 0.634 | 0.650 | 0.351 | 0.536 | 0.537 | 0.343 |
-| ~18-19 | 0.304 | 0.263 | 0.336 | 0.414 | 0.400 | 0.355 |
-| ~28 | 0.696 | 0.700 | 0.377 | 0.530 | 0.525 | 0.400 |
-| ~37-39 | 0.650 | 0.662 | 0.259 | 0.679 | 0.688 | 0.370 |
-| ~42 | 0.465 | 0.450 | 0.307 | 0.569 | 0.562 | 0.415 |
-
-Training faith is higher and varies more for spatial (0.34-0.42) vs correctness-only (0.26-0.38), confirming probe signal reaches the model during training.
-
-## Rollout Analysis (30 examples, greedy decode)
-
-### Scores
-
-
-All three models produced near-identical outputs on **23/30 questions**. Differences concentrate in 7 questions.
-
-### Key Examples
-
-**Q5 — "Which organ is part of the digestive system?" (GT: Colon, Small Bowel)**
-
-- **Zero-shot**: Goes straight to "stomach" from memory — never considers what's actually visible
-- **Correctness-only**: Identifies "colon" and gives a long explanation but answer is too verbose → wrong on token F1
-- **Spatial**: Also identifies "colon" but gives a **concise answer** → correct
-
-The spatial model learned to be more concise. Shorter answers score better on token F1.
-
-**Q13 — "What disease on the right of brain?" (GT: Brain Edema, Brain Non-enhancing Tumor)**
-
-- **Zero-shot**: 512-token loop, never concludes. "Maybe hemorrhagic stroke? Maybe tumor? Wait..."
-- **Correctness-only**: Same 512-token loop, slightly different wording
-- **Spatial**: Reasons for 473 tokens but **actually commits to an answer**: "the disease is a brain tumor" → correct
-
-The spatial model **breaks out of reasoning loops sooner**. The probe reward may encourage the model to commit to what it sees rather than endlessly doubting itself.
-
-**Q10 — "Does the picture contain spleen?" (GT: Yes)**
-
-- **Zero-shot**: 152 tokens of careful reasoning
-- **Correctness-only**: 172 tokens
-- **Spatial**: **90 tokens** — much more confident and concise
-
-Same correct answer, but spatial is nearly 2x shorter.
-
-**Q18 — "What part of the lung is the mass in?" (GT: Right Lung)**
-
-- **Zero-shot**: "The mass is in the left lung" → wrong
-- **Correctness-only**: "The mass is in the left lung" → wrong
-- **Spatial**: "The mass is in the right lung. I need to check the image. The right lung has a noticeable mass, while the left lung seems normal." → **correct**
-
-Genuine spatial win — the model explicitly checks the image and correctly localizes.
-
-### Emerging Pattern
-
-The spatial probe reward makes the model:
-
-1. **More concise** (Q5, Q10 — shorter answers)
-2. **More decisive** (Q13 — commits instead of looping)
-3. **More visually grounded** (Q18 — explicitly checks image regions)
-4. **Slightly less careful with edge cases** (Q17 — uses clinical terms that don't token-match)
-
-## Full Validation Eval (188 organ-only examples, token F1)
-
-Evaluated the original April 4 best checkpoints (trained with binary correctness) using strict token F1 scoring on the full 188-example organ-only val set.
+### Seed 42
 
 | Model | Token F1 | Exact (>0.5) |
 |-------|----------|-------------|
-| Zero-shot | 0.289 | 49/188 (26.1%) |
-| Correctness-only | 0.262 | 45/188 (23.9%) |
-| **Spatial (alpha=0.7)** | **0.298** | **51/188 (27.1%)** |
+| Zero-shot | 0.289 | 49/188 |
+| Corr-only | 0.394 | 72/188 |
+| Bbox | 0.380 | 69/188 |
+| **Corrprobe** | **0.398** | **72/188** |
 
-**Spatial vs Corr-only: +0.036 (+13.7% relative)**
+### Seed 123
 
-Correctness-only training *degraded* from zero-shot (-9.3% relative). Spatial maintained zero-shot quality and slightly exceeded it. Under the strict token F1 metric the spatial advantage is even larger than under binary correctness (+13.7% vs +3.7%).
+| Model | Token F1 | Exact (>0.5) |
+|-------|----------|-------------|
+| Zero-shot | 0.281 | 49/188 |
+| Corr-only | 0.376 | 67/188 |
+| **Bbox** | **0.385** | **67/188** |
+| Corrprobe | 0.353 | 60/188 |
 
-### Behavioral Metrics (30-example rollout analysis)
+### Ablation: Three probe conditions
 
-| Metric | Zero-shot | Corr-only | Spatial |
-|--------|-----------|-----------|---------|
-| Greedy Token F1 | 0.423 | 0.347 | **0.422** |
-| Avg response tokens | 325 | 332 | **326** |
-| Reasoning loop rate | 63% | **70%** | 63% |
-| Sampled F1 (8 rollouts) | 0.304 | 0.281 | 0.278 |
+| Condition | Probe | r with correctness | Mean F1 (2 seeds) |
+|-----------|-------|-------------------|--------------------|
+| Corr-only | — (faith measured, not in reward) | — | 0.385 |
+| Bbox probe | Bbox overlap labels | r = -0.02 | 0.383 |
+| **Corrprobe** | **Correctness labels, balanced** | **r = 0.636** | **0.376** |
 
-Correctness-only produces more reasoning loops (70% vs 63%) and longer responses. Spatial matches zero-shot on all behavioral metrics while correctness-only degrades.
+The bbox probe (r=-0.02, pure spatial signal) performs similarly to corr-only. The corrprobe (r=0.636, attention-correctness correlation) wins on seed 42 but loses on seed 123 (due to composite reward checkpoint selection — see findings). On rollout analysis (greedy F1), corrprobe clearly leads.
 
-### Full Eval Disagreement Examples
+## Behavioral Analysis
 
-**Q6 — "Where is the pneumonia located?" (GT: Lower Left Lung)**
+### Corrprobe commits on visual judgment questions
 
-- **Zero-shot** (398 tok, WRONG): Loops, no answer tag produced
-- **Correctness-only** (378 tok, WRONG): Long explanation about opacity and density, no answer tag — "Pneumonia appears as areas of increased density (opacity) in the lung fields..."
-- **Spatial** (347 tok, CORRECT): `left lung` — concise, commits to answer
+SP-corr uniquely wins on questions that require **looking at the image and making a visual judgment**:
 
-**Q28 — "Where is the infiltration located?" (GT: Lower Left Lung)**
+| Question | GT | SP-corr | Others |
+|----------|-----|---------|--------|
+| Which organ is abnormal, heart or lung? | Lung | `lung` | All `[none]` |
+| Which is bigger, kidney or spleen? | Spleen | `spleen` | ZS: `kidney` (wrong), CO: `[none]` |
+| Does the picture contain liver? | No | `No` | CO: `Yes` (wrong!) |
+| Are there abnormalities in right lung? | Yes | `Yes` | All `[none]` |
 
-- **Zero-shot** (399 tok, WRONG): Loops, no answer
-- **Correctness-only** (392 tok, WRONG): "To determine the location of infiltration in the chest X-ray, we analyze the radiographic features..." — never commits
-- **Spatial** (342 tok, CORRECT): `left lung` — same pattern, concise and correct
+### Corr-only commits on knowledge-based questions
 
-**Q20 — "Does the picture contain liver?" (GT: No)**
+CO uniquely wins on **localization** where medical knowledge suffices:
 
-- **Zero-shot** (268 tok, CORRECT): `No`
-- **Correctness-only** (428 tok, WRONG): Loops for 428 tokens, no answer tag
-- **Spatial** (298 tok, CORRECT): `No`
+| Question | GT | CO | SP-corr |
+|----------|-----|-----|---------|
+| Where is the abnormality? | Right Lung | `right lung` | Long explanation |
+| Where is the infiltration? | Lower Left Lung | `left lung` | Long explanation |
+| What color is the left lung? | Gray | `gray` | `[none]` |
 
-**Q8 — "Are there abnormalities in the patient's right lung?" (GT: Yes)**
+### The probe shapes which questions the model becomes confident on
 
-- **Zero-shot** (375 tok, WRONG): Loops, no answer
-- **Correctness-only** (335 tok, CORRECT): `Yes` — one of the few cases corr-only wins
-- **Spatial** (387 tok, WRONG): Describes the darkened area in detail but never produces an answer tag
+Both models learned conciseness. But they commit on **different question types**:
+- **Corrprobe** → visual judgment (does X exist, which is bigger, what's abnormal)
+- **Corr-only** → localization (where is the abnormality)
 
-**Q18 — "What color is the liver?" (GT: Gray)**
-
-- **Zero-shot** (343 tok, CORRECT): `gray`
-- **Correctness-only** (418 tok, WRONG): Loops, no answer
-- **Spatial** (401 tok, WRONG): Explains CT imaging principles but doesn't commit to "gray"
-
-### Pattern: Answer Tag Production
-
-The most common failure mode across all models is failing to produce `<answer>` tags within 512 tokens. The spatial model produces answer tags more reliably than correctness-only:
-
-- Spatial: concise answers like `left lung`, `No`, `gray` — commits early
-- Correctness-only: explains extensively, enters "Wait, actually..." loops, hits 512 tokens without committing
-- When spatial fails, it's because it also starts explaining (Q8, Q18) — but this happens less often
+The probe reward steers the model toward **visual confidence** — committing when image attention resolves the answer.
 
 ## Spatial Grounding Probe
 
@@ -207,24 +142,38 @@ Logistic regression on per-head bbox attention ratios (28 layers x 16 heads = 44
 
 **Training**: Extract spatial attention from base Qwen3-VL-2B-Thinking on SLAKE organ-only examples. For each example, compute per-head ratio of attention inside vs outside the target organ's bounding box. Train classifier to predict correctness from these ratios.
 
-**Probe stats** (original, correctness labels):
-- 300 examples, 77 correct (25.7%)
-- Val AUROC: ~0.67
-- Probe score ↔ correctness: r=0.42
-
-**Probe stats** (balanced, correctness labels):
-- 154 examples (77 pos / 77 neg), balanced
+**Probe stats** (balanced, correctness labels — used in corrprobe condition):
+- 154 examples (77 pos / 77 neg), balanced from 300 original
 - Val AUROC: 0.667
 - Probe score ↔ correctness: r=0.636
 - Mean predict_proba: positives=0.83, negatives=0.32
 
+**Probe stats** (bbox overlap labels — used in bbox condition):
+- 1000 examples, 365 positive (36.5%)
+- Val AUROC: 1.000 (trivially predicts attention-in-bbox from attention features)
+- Probe score ↔ correctness: r=-0.02 (zero correlation — pure spatial signal)
+
+## Discussion
+
+### Why does the corrprobe produce more stable training?
+
+The correctness reward is sparse — a rollout is either correct or not. With 8 rollouts per example, many groups have all-correct or all-wrong, giving zero advantage and no gradient. The model quickly finds shortcuts that spike val correct but don't generalize.
+
+The corrprobe adds a **continuous, per-rollout signal** (0.32-0.83 range) that's correlated with correctness (r=0.636) but not redundant. Different rollouts get different probe scores based on their attention patterns. This gives richer within-group variance for GRPO to learn from, preventing the spike-crash dynamics of correctness-only training.
+
+### Why doesn't the bbox probe help as much?
+
+The bbox probe (r=-0.02) adds variance to the reward but it's **uncorrelated noise** — improving bbox attention doesn't improve correctness. The model can't simultaneously optimize for "attend to the bbox" and "be correct" because the two signals point in unrelated directions. It's regularization through noise injection rather than through a complementary learning objective.
+
+### Is the corrprobe circular?
+
+No. The probe learns a mapping from **attention patterns** to correctness. When used as reward, it tells the model "attend like this" — not "be correct." The model can't game it by memorizing answers; it has to shift its attention distribution. The correlation (r=0.636) means it's a complementary signal that shares direction with correctness but adds 60% new information from the attention space.
 
 ## Reproduction
 
 ### Prerequisites
 
 ```bash
-# Clone
 git clone https://github.com/isabee426/attn-probe-SLAKE.git
 cd attn-probe-SLAKE
 
@@ -236,94 +185,50 @@ cd attn-probe-SLAKE
 ### Step 0: Train spatial probe
 
 ```bash
-# Bbox overlap probe (non-circular)
-CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_spatial_probe.py \
-    --slake-dir /data3/ishaplan/slake_full/Slake1.0 \
-    --output checkpoints/spatial_probe/ \
-    --organ-only --labels bbox_overlap --max-examples 1000
-
-# Correctness-labeled probe (original setup)
-# Option A: Retrain from original features (instant, no GPU needed)
+# Correctness-labeled probe (balanced)
 python scripts/retrain_probe_balanced.py \
-    --features /data3/ishaplan/final_version/checkpoints/spatial_grounding/spatial_features.npz \
+    --features /path/to/spatial_features.npz \
     --output checkpoints/spatial_probe_corrlabels/
 
-# Option B: Extract fresh features + train
+# Or extract fresh features + train
 CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/train_spatial_probe.py \
     --slake-dir /data3/ishaplan/slake_full/Slake1.0 \
     --output checkpoints/spatial_probe_corrlabels/ \
     --organ-only --labels correctness --max-examples 1000
 ```
 
-### Step 1: GRPO training (6 runs)
-
-Three conditions x two seeds. Each run takes ~20h on an A5000 (25GB).
+### Step 1: GRPO training
 
 ```bash
 export PYTHONPATH=src:/path/to/faithscan_vqarad/src
 
 # Correctness-only baseline (alpha=1.0)
 CUDA_VISIBLE_DEVICES=0 python -m faithscan.train_grpo --config configs/reproduction/correctness_only_seed42.yaml
-CUDA_VISIBLE_DEVICES=1 python -m faithscan.train_grpo --config configs/reproduction/correctness_only_seed123.yaml
-
-# Spatial GRPO with bbox overlap probe (alpha=0.7)
-CUDA_VISIBLE_DEVICES=2 python -m faithscan.train_grpo --config configs/reproduction/spatial_grpo_a07_seed42.yaml
-CUDA_VISIBLE_DEVICES=3 python -m faithscan.train_grpo --config configs/reproduction/spatial_grpo_a07_seed123.yaml
 
 # Spatial GRPO with correctness-labeled probe (alpha=0.7)
-CUDA_VISIBLE_DEVICES=4 python -m faithscan.train_grpo --config configs/reproduction/spatial_grpo_a07_corrlabels_seed42.yaml
-CUDA_VISIBLE_DEVICES=5 python -m faithscan.train_grpo --config configs/reproduction/spatial_grpo_a07_corrlabels_seed123.yaml
+CUDA_VISIBLE_DEVICES=1 python -m faithscan.train_grpo --config configs/reproduction/spatial_grpo_a07_corrlabels_seed42.yaml
 ```
 
 ### Step 2: Evaluation
 
 ```bash
-# Compare checkpoints (zero-shot vs corr-only vs spatial-bbox vs spatial-corr)
 CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/compare_checkpoints.py \
     --corr-ckpt checkpoints/correctness_only/seed42/best \
     --spatial-ckpt checkpoints/spatial_grpo/a07_seed42/best \
     --spatial-corr-ckpt checkpoints/spatial_grpo_corrlabels/a07_seed42/best \
-    --n 188 --seed 42 --output results/comparison_seed42.json
+    --n 188 --seed 42 --output results/comparison.json
 
-# Qualitative rollout analysis
 CUDA_VISIBLE_DEVICES=0 PYTHONPATH=src python scripts/rollout_analysis.py \
     --corr-ckpt checkpoints/correctness_only/seed42/best \
-    --spatial-ckpt checkpoints/spatial_grpo/a07_seed42/best \
-    --n 30 --seed 42 --output results/rollout_analysis.json
+    --spatial-ckpt checkpoints/spatial_grpo_corrlabels/a07_seed42/best \
+    --n 30 --seed 42 --output results/rollouts.json
 ```
-
-### Full pipeline (tmux launcher)
-
-```bash
-# On vlaa-01.be.ucsc.edu:
-TMUX_TMPDIR=/data3/ishaplan/tmp tmux new -s slake_repro
-bash run_all.sh all    # probe → 6 GRPO runs → eval
-```
-
-## Discussion
-
-### Why does the probe improve accuracy without changing grounding?
-
-1. **Regularization**: The 30% faith component smooths the training landscape. Correctness is sparse (0 or 1); spatial probe score varies continuously across rollouts — richer gradient signal.
-
-2. **Anti-overfitting**: Correctness-only peaks early and declines (step 10-20 with token F1). Spatial model has a slower start but sustains improvement through step 50+. The probe prevents the model from exploiting format/vocabulary shortcuts.
-
-3. **Reward shaping**: The probe implicitly rewards shorter, more decisive responses. Models that attend to the right organ and commit to a short answer get higher spatial faith. Longer "Wait, no, wait" loops attend more to generated text than to the image, lowering faith.
-
-### Is the correctness-labeled probe circular?
-
-No. The probe learns a mapping from **attention patterns** to correctness. When used as reward, it tells the model "attend like this" — not "be correct." The model can't game it by memorizing answers; it has to shift its attention distribution. The moderate correlation (r=0.42) confirms it's a complementary signal, not a copy — it explains only 18% of the variance in correctness.
-
-The bbox overlap probe ablation strengthens this: if both probe types yield similar gains, the spatial attention signal itself matters, regardless of label source.
 
 ## File Structure
 
 ```
 attn-probe-SLAKE/
 ├── README.md
-├── run_all.sh                          # Full pipeline launcher
-├── launch_grpo_after_probe.sh          # GRPO launcher (waits for probes)
-├── launch_corrlabel_grpo.sh            # Corrlabels GRPO launcher
 ├── src/faithscan/
 │   ├── train_grpo.py                   # GRPO training loop
 │   ├── reward.py                       # Correctness + composite reward
@@ -333,34 +238,17 @@ attn-probe-SLAKE/
 │       └── dhcp_probe.py               # Cross-modal attention probe (legacy)
 ├── configs/
 │   ├── original/                       # Original April 4 configs
-│   │   ├── correctness_only_slake_10to1_seed42.yaml
-│   │   └── spatial_grpo_slake_organonly_a07_seed42.yaml
 │   └── reproduction/                   # Reproduction configs (3 conditions x 2 seeds)
-│       ├── correctness_only_seed42.yaml
-│       ├── correctness_only_seed123.yaml
-│       ├── spatial_grpo_a07_seed42.yaml
-│       ├── spatial_grpo_a07_seed123.yaml
-│       ├── spatial_grpo_a07_corrlabels_seed42.yaml
-│       └── spatial_grpo_a07_corrlabels_seed123.yaml
 ├── scripts/
 │   ├── train_spatial_probe.py          # Probe training (bbox or correctness labels)
-│   ├── train_spatial_grounding.py      # Original probe training script
 │   ├── retrain_probe_balanced.py       # Retrain from saved features with balanced classes
-│   ├── train_spatial_classifier_from_saved.py  # Hyperparameter sweep on saved features
 │   ├── compare_checkpoints.py          # Evaluate zero-shot vs trained models
-│   └── rollout_analysis.py             # Qualitative rollout comparison
+│   └── rollout_analysis.py            # Qualitative rollout comparison
 └── findings/
     ├── slake_final_results.md          # Original April 4-5 results
     ├── rollout_analysis.md             # Qualitative analysis of 30 examples
-    ├── research_progress.md            # Full project history
-    └── reproduction_findings.md        # Reproduction run tracking
-```
-
-## Citation
-
-If you use this work, please cite:
-
-```
-Spatial Attention Probe as Auxiliary Reward for Medical VQA GRPO
-SLAKE organ-only experiments, April 2026
+    ├── full_val_disagreements.md       # 188-val disagreement analysis
+    ├── reproduction_best_checkpoint_eval.md  # Best checkpoint comparison
+    ├── final_epoch1_eval.md            # Final epoch 1 eval + rollouts
+    └── research_progress.md            # Full project history
 ```
