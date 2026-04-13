@@ -75,7 +75,7 @@ Step 10→20→30→40→50→60→70→80→90
 | Bbox | s123 | 0.402 | 80 | Mixed |
 | **Corrprobe** | **s42** | **0.406** | **90** | **Yes — monotonically increasing - 2 epoch runs have been launched** |
 
-## 188-Val Eval (token F1, epoch 1 checkpoints)
+## 188-Val Eval (token F1, peak checkpoints)
 
 ### Seed 42
 
