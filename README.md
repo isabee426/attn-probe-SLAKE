@@ -128,13 +128,40 @@ CO uniquely wins on **localization** where medical knowledge suffices:
 | Where is the infiltration? | Lower Left Lung | `left lung` | Long explanation |
 | What color is the left lung? | Gray | `gray` | `[none]` |
 
+### Full SLAKE eval (542 val, all question types)
+
+On the full dataset (not just organ-only), the models are nearly tied (CO: 0.404, SP-corr: 0.399 F1) but the behavioral split persists. 498/542 (92%) agree. 18 SP-corr unique wins, 19 CO unique wins.
+
+**SP-corr unique wins on full SLAKE — visual interpretation:**
+
+| Question | GT | SP-corr | CO |
+|----------|-----|---------|-----|
+| What is the largest organ? | Brain | `brain` | Long explanation, no tag |
+| Where is the abnormality? | Right | `right hemisphere` | Long explanation, no tag |
+| What color is the brain tumor? | White | `white` | `hyperintense` (synonym, lower F1) |
+| Does humerus head exist? | No | `No` | `[none]` |
+| Is the lung healthy? | No | `No` | `[none]` |
+| Which organs are sensory organs? | Eyes | `eyes, ears` | `[none]` |
+
+**CO unique wins on full SLAKE — simple recall:**
+
+| Question | GT | CO | SP-corr |
+|----------|-----|-----|---------|
+| Does picture contain liver? | Yes | `Yes` | Long explanation |
+| Does picture contain spinal cord? | Yes | `Yes` | `[none]` |
+| Which organ belongs to circulatory system? | Heart | `heart` | Long explanation |
+| What modality? | CT | `CT` | `computed tomography (CT)` (too verbose) |
+| Which plane is the image scanned? | Transverse Plane | `transverse plane` | `[none]` |
+
+**Token F1 penalizes corrprobe's precision:** "computed tomography (CT)" vs "CT", "thoracic cavity" vs "chest", "hyperintense" vs "white". Corrprobe gives more clinically precise answers but scores lower because the metric rewards token overlap with short ground truths.
+
 ### The probe shapes which questions the model becomes confident on
 
 Both models learned conciseness. But they commit on **different question types**:
-- **Corrprobe** → visual judgment (does X exist, which is bigger, what's abnormal)
-- **Corr-only** → localization (where is the abnormality)
+- **Corrprobe** → visual judgment and image interpretation (does X exist, which is bigger, what's abnormal, what color is the lesion)
+- **Corr-only** → simple existence checks and knowledge recall (does picture contain X, what modality, which plane)
 
-The probe reward steers the model toward **visual confidence** — committing when image attention resolves the answer.
+The probe reward steers the model toward **visual confidence** — committing when image attention resolves the answer. Corr-only develops **knowledge-based confidence** — committing when a short factual answer suffices regardless of image content.
 
 ## Spatial Grounding Probe
 
