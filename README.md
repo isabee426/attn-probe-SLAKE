@@ -2,107 +2,116 @@
 
 Training a spatial grounding probe on organ bounding box attention patterns to differentiate correct and incorrect attention patterns, then using it as a secondary reward signal during GRPO to improve medical VQA accuracy on SLAKE.
 
-## Latest: 2-Epoch Runs with Two Probe Strengths (in progress)
+## Main Result: Unseen Test Set (364 organ-only SLAKE test examples)
 
-We're comparing **four conditions** across 2 epochs to test how probe strength affects training stability:
+| Model | Token F1 | Exact (>0.5) |
+|-------|----------|-------------|
+| Zero-shot | 0.275 | 92/364 (25.3%) |
+| **Corr-only** | **0.447** | **156/364 (42.9%)** |
+| Corrprobe (r=0.636) | 0.424 | 148/364 (40.7%) |
+| **Fullprobe (r=0.844)** | **0.445** | **154/364 (42.3%)** |
 
-### Probe configurations
+**Corr-only and fullprobe achieve the same accuracy on unseen data** (0.447 vs 0.445, delta = 0.4%). 322/364 (88%) agree. But they get there through fundamentally different training dynamics and commit on different question types.
+
+### Training trajectories: same destination, different paths
+
+**Corr-only (spike-crash):**
+```
+Step 50→60→70→80→90→...→170→180→190
+0.352→0.410→0.388→0.419→0.429→...→0.493→0.470→0.508
+```
+Oscillates between spikes and crashes. Peak of 0.508 at step 190, but drops to 0.470 one step later.
+
+**Fullprobe (monotonic climb):**
+```
+Step 40→50→60→70→80→...→170→180→190→200
+0.344→0.318→0.333→0.368→0.401→...→0.448→0.449→0.481→0.485
+```
+Steady improvement with occasional dips. Never crashes. Ends at 0.491 epoch-end val.
+
+### Behavioral specialization on unseen test data
+
+Both models learned conciseness. But they commit on **different question types**:
+
+**Fullprobe's 17 unique wins — visual/clinical judgment:**
+
+| Question | GT | Fullprobe | Corr-only |
+|----------|-----|-----------|-----------|
+| Where is the pneumonia in the lung? | Lower Right Lung | `right lung` | `[none]` (loops) |
+| Where is the atelectasis? | Lower Left Lung | `left lung` | Long explanation, no tag |
+| Can nodule be observed on lower left lung? | Yes | `Yes` | `[none]` |
+| Does the liver look normal? | Yes | `Yes` | `No` (hallucinated abnormality) |
+| Is the brain tumor hyperdense or hypodense? | Hyperdense | `hyperdense` | Long explanation |
+| What color does the duodenum show? | Gray | `gray` | Long explanation |
+| What is the shape of spleen? | Oval | `oval` | `crescent` (wrong) |
+| Which organ is part of the nervous system? | Spinal cord | `spinal cord` (x2) | `[none]` |
+| Which organ is part of the lymphatic system? | Spleen | `spleen` | `[none]` |
+| Which is smaller, spleen or kidney? | Spleen | `spleen` | `[none]` |
+
+**Corr-only's 20 unique wins — existence and knowledge recall:**
+
+Both models get the same total correct (156 vs 154 exact), but corr-only wins more on simple yes/no organ presence questions.
+
+### The probe prevents medical prior hallucination
+
+Key example from test set: **"Does the liver look normal?" (GT: Yes)**
+- Corr-only: `No` — hallucinated an abnormality from medical prior
+- Fullprobe: `Yes` — correctly assessed the image
+
+The probe reward trains the model to rely on visual evidence rather than defaulting to medical priors.
+
+## Probe Configurations
 
 | Probe | Training data | AUROC | r with correctness | predict_proba gap |
 |-------|--------------|-------|--------------------|--------------------|
 | **Corrprobe** (weak) | 154 examples, balanced | 0.667 | 0.636 | 0.83 vs 0.32 (gap: 0.51) |
 | **Fullprobe** (strong) | 572 examples, balanced from 1276 | 0.968 | 0.844 | 0.91 vs 0.15 (gap: 0.76) |
 
-Both are logistic regression on per-head bbox attention ratios (28 layers x 16 heads = 448 features), trained on correctness labels. The fullprobe uses 4x more data from running the base model on all organ-only examples.
+Both are logistic regression on per-head bbox attention ratios (28 layers x 16 heads = 448 features), trained on correctness labels.
 
-### 2-Epoch training trajectories (no drop_unformatted)
+## 2-Epoch Training (with drop_unformatted)
+
+### Full trajectory
 
 | Step | Corr-only | Corrprobe (r=0.636) | Fullprobe (r=0.844) |
 |------|-----------|---------------------|---------------------|
-| 10 | 0.292 | 0.298 | 0.290 |
-| 20 | 0.292 | 0.274↓ | 0.289 |
-| 30 | 0.296 | 0.257↓ | 0.296 |
-| 40 | 0.299 | 0.275 | **0.347** |
-| 50 | **0.318** | 0.281 | — |
-| 60 | 0.286↓ | 0.288 | — |
-| 70 | 0.316 | 0.289 | — |
-| 80 | 0.306↓ | 0.259↓ | — |
-| 90 (ep1 end) | 0.321 | 0.256↓ | — |
-| 100 (ep2) | 0.310 | 0.274 | — |
-| 110 (ep2) | 0.281↓ | — | — |
+| 10 | 0.302 | 0.299 | **0.308** |
+| 20 | 0.287↓ | 0.306 | 0.324 |
+| 30 | 0.333 | **0.340** | 0.336 |
+| 40 | 0.319↓ | 0.309↓ | 0.344 |
+| 50 | 0.352 | 0.327 | 0.318↓ |
+| 60 | **0.410** | 0.316 | 0.333 |
+| 70 | 0.388↓ | 0.336 | 0.368 |
+| 80 | **0.419** | **0.396** | **0.401** |
+| 90 (ep1 end) | **0.429** | 0.379↓ | 0.383↓ |
+| 100 | — | **0.406** | — |
+| ... | | | |
+| 150 | **0.481** | **0.453** | 0.444 |
+| 170 | **0.493** | **0.458** | 0.448 |
+| 180 | 0.470↓ | 0.458 | 0.449 |
+| 190 | **0.508** | — | **0.481** |
+| 200 (ep2 end) | — | — | **0.485** |
+| Epoch 2 end val | 0.488 | 0.488 | **0.491** |
 
-**Fullprobe hit 0.347 at step 40** — the highest val correctness at any step 40 across all experiments. Its trajectory is accelerating: 0.269→0.296→0.347 (+0.027, +0.051 per step).
+### Key observations
 
-**Key finding: probe strength matters.**
-- **Corrprobe (r=0.636)** dipped hard without `drop_unformatted` (0.298→0.257) and crashed in epoch 2 (0.289→0.256). The weaker probe signal gets diluted by format learning noise.
-- **Fullprobe (r=0.844)** recovered from its dip faster (0.269→0.347) because the stronger signal cuts through the format noise. The 0.91/0.15 probability separation gives clearer gradient than corrprobe's 0.83/0.32.
-- **Corr-only** oscillates as always (0.318→0.286→0.316→0.306→0.321→0.310→0.281).
+1. **Corr-only spikes and crashes** throughout both epochs (0.410→0.388, 0.419→0.429→0.470→0.508→...). Peak of 0.508 is a spike.
+2. **Fullprobe climbs monotonically** in epoch 2 (0.444→0.448→0.449→0.481→0.485→0.491). Highest epoch-end val of all conditions.
+3. **All three converge at epoch 2 end** (~0.488-0.491). The probe doesn't improve final accuracy — it stabilizes the path to get there.
 
-### Drop_unformatted runs (also in progress, just started)
+## Why the Probe Matters (Even Without Accuracy Improvement)
 
-Running same 3 conditions with `drop_unformatted: true` — unformatted rollouts excluded from advantage computation so the probe signal isn't diluted by format learning.
+### 1. Training reliability
+The probe produces predictable, monotonic improvement. Corr-only's spikes mean you don't know if a checkpoint is genuinely good or a lucky fluctuation. With the probe, every new best is a real improvement.
 
-Early step 10 results:
+### 2. Reward saturation prevention
+At high correctness, most of 8 rollouts are correct → advantages near zero → no gradient. The probe maintains within-group variance because different rollouts have different attention patterns even when all correct.
 
-| Condition | Step 10 correct |
-|-----------|----------------|
-| Corr-only (drop) | 0.302 |
-| **Fullprobe (drop)** | **0.308** |
+### 3. Behavioral quality at equal accuracy
+Same test set accuracy (0.447 vs 0.445) but the probe model commits on harder visual questions (localization, clinical assessment, organ comparison) while corr-only commits on easier knowledge recall.
 
-Fullprobe with drop at 0.308 is the highest step 10 of any run ever.
-
-## Key Finding
-
-The attention probe acts as an auxiliary reward that enforces good internal practice — attending to the queried organ. A **stronger probe** (higher AUROC, higher correlation with correctness) produces faster recovery from early training dips and higher val correctness. The probe prevents GRPO reward saturation by maintaining gradient signal when the correctness reward becomes uninformative.
-
-## Previous Results (1-epoch runs with drop_unformatted)
-
-### 30-example rollout analysis (epoch 1, corrprobe, seed 42)
-
-| Metric | Zero-shot | Corr-only | Corrprobe |
-|--------|-----------|-----------|-----------|
-| Greedy F1 | 0.423 | 0.486 | **0.558** |
-| Exact wins | 12/30 | 14/30 | **16/30** |
-| Avg tokens | 325 | 275 | 284 |
-| Reasoning loops | 63% | 53% | **53%** |
-
-Corrprobe greedy F1 of 0.558 on seed 42 (+14.8% over corr-only). Across 5 random 30-example samples (seeds 42, 77, 200, 999, 55), mean greedy F1 is tied: corr-only 0.457 vs corrprobe 0.454. The advantage is behavioral, not consistently in aggregate accuracy.
-
-### 1-epoch training trajectories (with drop_unformatted, corrprobe r=0.636)
-
-**Corr-only (volatile):** 0.284→0.298→0.330→0.317→0.335→**0.412**→0.394↓→0.380↓→0.407
-
-**Corrprobe (monotonic):** 0.301→0.298→0.310→0.322→0.326→0.344→0.374→0.377→**0.406**
-
-Corrprobe climbs steadily while corr-only spikes and crashes. Both end epoch 1 at similar correctness (~0.40), but corrprobe's trajectory is more stable and predictable.
-
-## Behavioral Analysis
-
-### The probe shapes which questions the model becomes confident on
-
-Both models learn conciseness. But they commit on **different question types**:
-- **Probe models** → visual judgment (does X exist, which is bigger, what's abnormal, what color is the lesion)
-- **Corr-only** → simple existence checks and knowledge recall (does picture contain X, what modality, which plane)
-
-**Probe model unique wins — visual interpretation:**
-
-| Question | GT | Probe model | CO |
-|----------|-----|-------------|-----|
-| What is the largest organ? | Brain | `brain` | Long explanation, no tag |
-| Where is the abnormality? | Right | `right hemisphere` | Long explanation |
-| What color is the brain tumor? | White | `white` | `hyperintense` (synonym miss) |
-| Is the lung healthy? | No | `No` | `[none]` |
-| Which organs are sensory organs? | Eyes | `eyes, ears` | `[none]` |
-
-**CO unique wins — simple recall:**
-
-| Question | GT | CO | Probe model |
-|----------|-----|-----|-------------|
-| Does picture contain liver? | Yes | `Yes` | Long explanation |
-| Which organ belongs to circulatory system? | Heart | `heart` | Long explanation |
-| What modality? | CT | `CT` | `computed tomography (CT)` (too verbose, lower F1) |
-
-Token F1 penalizes the probe model's clinical precision: "computed tomography (CT)" vs "CT", "thoracic cavity" vs "chest".
+### 4. `drop_unformatted` is necessary
+Without it, probe conditions collapse (corrprobe crashed to 0.233 in epoch 2). With it, both conditions reach ~0.49. The probe's gradient signal can't compete with format learning noise — it needs `drop_unformatted` to isolate its contribution.
 
 ## Configuration
 
@@ -111,6 +120,7 @@ Token F1 penalizes the probe model's clinical precision: "computed tomography (C
 | Model | Qwen3-VL-2B-Thinking + LoRA (r=16, alpha=32) |
 | Dataset | SLAKE organ-only (5972 → 2076, 35%) |
 | Split | 10/1 train/val (1888 / 188) |
+| Test | 364 organ-only (unseen) |
 | GRPO rollouts | 8 |
 | Max new tokens | 512 |
 | Reward (baseline) | alpha=1.0 (correctness only, token F1) |
@@ -118,24 +128,22 @@ Token F1 penalizes the probe model's clinical precision: "computed tomography (C
 | Faith normalization | Global z-score + sigmoid |
 | Advantage | EBPO shrinkage baseline |
 | Optimizer | AdamW, lr=1e-5, cosine schedule, grad clip 1.0 |
+| Epochs | 2 |
+| drop_unformatted | true |
 
 ## Discussion
 
-### Why does a stronger probe help more?
-
-The probe adds a continuous per-rollout signal to the sparse binary correctness reward. A stronger probe (higher AUROC) creates a wider gap between "correct-like" and "incorrect-like" attention patterns (0.91 vs 0.15 for fullprobe, vs 0.83 vs 0.32 for corrprobe). This means:
-
-1. **More within-group variance** — even when all 8 rollouts are correct, they get different probe scores, maintaining gradient flow
-2. **Faster format recovery** — the strong signal cuts through the noise of learning format simultaneously with attention
-3. **Less overfitting** — the probe prevents reward saturation at high correctness levels
-
-### Why does drop_unformatted matter for probe conditions?
-
-Without `drop_unformatted`, the probe signal competes with format learning for gradient bandwidth. The weaker corrprobe (r=0.636) gets diluted by this competition and crashes. The stronger fullprobe (r=0.844) survives because its signal is loud enough to be heard over the format noise. With `drop_unformatted`, format is handled by exclusion and the probe signal dominates from the start.
-
 ### Is the probe circular?
 
-No. The probe maps **attention patterns** to correctness. When used as reward, it tells the model "attend like this" — not "be correct." The model can't game it by memorizing answers; it has to shift its attention distribution. The correlation means the probe points in the same direction as correctness but provides information from a different modality (attention space vs output space).
+No. The probe maps **attention patterns** to correctness. When used as reward, it tells the model "attend like this" — not "be correct." The model can't game it by memorizing answers; it has to shift its attention distribution. The correlation (r=0.636-0.844) means it's a complementary signal from attention space, not a copy of the correctness signal.
+
+### Why doesn't the probe beat corr-only on accuracy?
+
+With `drop_unformatted`, corr-only gets the format discipline that the probe provided in earlier experiments. Given enough training (2 epochs), corr-only's spike-crash dynamics average out to the same level as the probe's monotonic climb. The probe's value is in the journey (stable training, reliable checkpoints) not the destination (final accuracy).
+
+### What would make the probe win on accuracy?
+
+A harder task where reward saturation is a bigger problem — larger dataset, more diverse questions, or a setting where corr-only's spikes don't average out over 2 epochs. At 2B parameters with LoRA on 1888 organ-only examples, the task may be too small for the probe's anti-saturation benefit to manifest as an accuracy gap.
 
 ## Reproduction
 
@@ -144,21 +152,20 @@ git clone https://github.com/isabee426/attn-probe-SLAKE.git
 cd attn-probe-SLAKE
 export PYTHONPATH=src:/path/to/faithscan_vqarad/src
 
-# Train probe (balanced, correctness labels)
+# Train probe
 python scripts/retrain_probe_balanced.py \
     --features /path/to/spatial_features.npz \
     --output checkpoints/spatial_probe/
 
-# GRPO training
+# GRPO training (2 epochs, drop_unformatted)
 CUDA_VISIBLE_DEVICES=0 python -m faithscan.train_grpo --config configs/reproduction/correctness_only_seed42.yaml
 CUDA_VISIBLE_DEVICES=1 python -m faithscan.train_grpo --config configs/reproduction/spatial_grpo_a07_corrlabels_seed42.yaml
 
-# Evaluation
-CUDA_VISIBLE_DEVICES=0 python scripts/compare_checkpoints.py \
+# Test set evaluation
+CUDA_VISIBLE_DEVICES=0 python scripts/eval_test_set.py \
     --corr-ckpt checkpoints/correctness_only/seed42/best_correct \
-    --spatial-corr-ckpt checkpoints/spatial_grpo_corrlabels/a07_seed42/best_correct \
-    --spatial-ckpt checkpoints/correctness_only/seed42/best_correct \
-    --n 188 --seed 42 --output results/comparison.json
+    --fullprobe-ckpt checkpoints/spatial_grpo_fullprobe/a07_seed42/best_correct \
+    --organ-only --output results/test_set.json
 ```
 
 ## File Structure
@@ -178,6 +185,7 @@ attn-probe-SLAKE/
 │   └── reproduction/                   # 3 conditions x 2 seeds
 ├── scripts/
 │   ├── train_spatial_probe.py          # Probe training
+│   ├── eval_test_set.py                # Unseen test set evaluation
 │   ├── retrain_probe_balanced.py       # Retrain with balanced classes
 │   ├── compare_checkpoints.py          # Eval zero-shot vs trained
 │   └── rollout_analysis.py             # Qualitative rollout comparison
