@@ -48,9 +48,20 @@ Both models learned conciseness. But they commit on **different question types**
 | Which organ is part of the lymphatic system? | Spleen | `spleen` | `[none]` |
 | Which is smaller, spleen or kidney? | Spleen | `spleen` | `[none]` |
 
-**Corr-only's 20 unique wins — existence and knowledge recall:**
+**Corr-only's 20 unique wins — existence, knowledge recall, and some visual:**
 
-Both models get the same total correct (156 vs 154 exact), but corr-only wins more on simple yes/no organ presence questions.
+| Question | GT | Corr-only | Fullprobe |
+|----------|-----|-----------|-----------|
+| Which organ is abnormal, heart or lung? | Lung | `lung` | `[none]` or `heart` (wrong) |
+| Where is the nodule? | Upper Right Lung | `right lung` | `left lung` (wrong) |
+| Does the picture contain liver? | No | `No` | `Yes` (hallucinated presence) |
+| What disease is shown on left of lung? | Pulmonary Mass | `mass` | Long explanation |
+| Can pneumonia be observed on right lung? | Yes | `Yes` | Long explanation |
+| Is there an esophagus in this image? | No | `No` | `[none]` |
+| Which is smaller, bladder or rectum? | Rectum | `rectum` | `[none]` |
+| Does picture contain spinal cord? | Yes | `Yes` | Long explanation |
+
+Corr-only wins on a mix of existence checks, localization, and some visual questions that fullprobe either loops on or gets wrong. Both models have blind spots — they just differ on which questions.
 
 ### The probe prevents medical prior hallucination
 
