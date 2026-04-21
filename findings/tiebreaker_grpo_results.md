@@ -55,23 +55,62 @@ Best-val-correct checkpoint used for each run.
 
 ### The generalization pattern
 
-- **corr and full overfit**: val peaks ~0.48–0.51, test drops to 0.39–0.41. Policies specialize to the organ-only training distribution.
-- **Tiebreaker does not overfit**: val peak 0.49, test **higher** at 0.53. Policy learned the underlying task rather than the training-distribution artifacts.
+- **corr and full overfit**: val peaks 0.48–0.51, test drops to 0.39–0.41. Policies specialize to the organ-only training distribution.
+- **Tiebreaker does not overfit**: val 0.49 at checkpoint eval'd, test **higher** at 0.53. (Tiebreak's subsequent val peak is 0.52 at step 270, but the test eval was run on the step-170 best_correct checkpoint; an updated test eval on the later checkpoint is pending.) Policy learned the underlying task rather than the training-distribution artifacts.
 
 Mechanism hypothesis: rank-based advantage with faith-tiebreaker preserves the pure-correctness objective exactly (no reward contamination from faith signal), so the policy does not chase faith patterns that bind to training-distribution artifacts. Corr_only has the same invariance but lacks the dense gradient signal from tiebreaker, so converges to a lower-quality solution.
 
 ## Val trajectories (correctness only, token F1)
 
-| Step | corr_s42 | corr_s456 | full_s42 | tiebreak_s456 | tiebreak_s42 |
-|---|---|---|---|---|---|
-| 10 | 0.3151 | 0.2581 | 0.2780 | 0.2806 | 0.3000 |
-| 40 | 0.3381 | 0.3021 | 0.3092 | 0.2955 | 0.3893 |
-| 70 | 0.3524 | 0.3596 | 0.3945 | 0.3997 | — |
-| 100 | 0.4106 | 0.3822 | 0.4498 | 0.4521 | — |
-| 130 | 0.4442 | 0.4013 | 0.4757 | 0.4651 | **0.5148** |
-| 160 | — | — | 0.4815 | 0.4844 | — |
-| 170 | 0.4792 | 0.4332 | 0.5020 | **0.4928** | — |
-| 180 | 0.4844 | 0.4406 | **0.5126** | — | — |
+Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the run has not yet reached that step.
+
+| Step | corr_s42 | corr_s456 | full_s42 | tiebreak_s456 | tiebreak_s42 | corrrank_s42 | corrrank_s456 |
+|---|---|---|---|---|---|---|---|
+| 10 | 0.3151 | 0.2581 | 0.2780 | 0.2806 | 0.3000 | 0.2897 | 0.2587 |
+| 20 | 0.3255 | 0.2753 | 0.2895 | 0.2733 | 0.3190 | 0.2820 | 0.2855 |
+| 30 | 0.3022 | 0.2851 | 0.3057 | 0.2932 | 0.3613 | 0.2966 | 0.2883 |
+| 40 | 0.3381 | 0.3021 | 0.3092 | 0.2955 | 0.3893 | 0.3144 | 0.3069 |
+| 50 | 0.3733 | 0.3070 | 0.3185 | 0.3448 | 0.4040 | 0.3191 | 0.2790 |
+| 60 | 0.3745 | 0.3175 | 0.3430 | 0.3931 | 0.4160 | 0.3191 | 0.2844 |
+| 70 | 0.3524 | 0.3596 | 0.3945 | 0.3997 | 0.4317 |  |  |
+| 80 | 0.4168 | 0.3232 | 0.4258 | 0.4145 | 0.4356 |  |  |
+| 90 | 0.4070 | 0.3430 | 0.4152 | 0.4151 | 0.5030 |  |  |
+| 100 | 0.4106 | 0.3822 | 0.4498 | 0.4521 | 0.5122 |  |  |
+| 110 | 0.4163 | 0.3600 | 0.4473 | 0.4364 | 0.5077 |  |  |
+| 120 | 0.4271 | 0.3962 | 0.4428 | 0.4798 | 0.5015 |  |  |
+| 130 | 0.4442 | 0.4013 | 0.4757 | 0.4651 | 0.5148 |  |  |
+| 140 | 0.4611 | 0.4222 | 0.4822 | 0.4766 | 0.4911 |  |  |
+| 150 | 0.4652 | 0.3990 | 0.4767 | 0.4689 | 0.5186 |  |  |
+| 160 | 0.4689 | 0.4083 | 0.4815 | 0.4844 |  |  |  |
+| 170 | 0.4792 | 0.4332 | 0.5020 | 0.4928 |  |  |  |
+| 180 | 0.4844 | 0.4406 | 0.5126 | 0.4720 |  |  |  |
+| 190 | 0.4796 | 0.4105 |  | 0.4705 |  |  |  |
+| 200 |  |  |  | 0.4795 |  |  |  |
+| 210 |  |  |  | 0.4903 |  |  |  |
+| 220 |  |  |  | 0.4826 |  |  |  |
+| 230 |  |  |  | 0.5023 |  |  |  |
+| 240 |  |  |  | 0.5145 |  |  |  |
+| 250 |  |  |  | 0.5064 |  |  |  |
+| 260 |  |  |  | 0.5052 |  |  |  |
+| 270 |  |  |  | **0.5201** |  |  |  |
+| 280 |  |  |  | 0.5129 |  |  |  |
+| 290 |  |  |  | 0.5077 |  |  |  |
+| 300 |  |  |  | 0.5106 |  |  |  |
+| 310 |  |  |  | 0.4961 |  |  |  |
+| 320 |  |  |  | 0.5149 |  |  |  |
+| 330 |  |  |  | 0.5177 |  |  |  |
+| 340 |  |  |  | 0.5092 |  |  |  |
+| 350 |  |  |  | 0.5110 |  |  |  |
+| 360 |  |  |  | 0.5018 |  |  |  |
+| 370 |  |  |  | 0.5160 |  |  |  |
+| 380 |  |  |  | 0.4745 |  |  |  |
+| 390 |  |  |  | 0.4838 |  |  |  |
+| 400 |  |  |  | 0.4693 |  |  |  |
+| 410 |  |  |  | 0.4814 |  |  |  |
+| 420 |  |  |  | 0.4745 |  |  |  |
+| 430 |  |  |  | 0.4691 |  |  |  |
+| 440 |  |  |  | 0.4692 |  |  |  |
+| 450 |  |  |  | 0.4951 |  |  |  |
 
 ### Matched-seed comparisons
 
@@ -84,13 +123,43 @@ Mechanism hypothesis: rank-based advantage with faith-tiebreaker preserves the p
 - full_s42: 0.4757
 - tiebreak_s42: **0.5148** — **Δ +0.071 over corr, +0.039 over full**
 
-### Cross-method peak (sweep leaderboard by val)
+### Cross-method peak val correctness
 
-1. tiebreak_s42: 0.5148 (step 130)
-2. full_s42: 0.5126 (step 180)
-3. tiebreak_s456: 0.4928 (step 170)
+1. tiebreak_s456: **0.5201** (step 270, ~3 epochs deep)
+2. tiebreak_s42: 0.5186 (step 150, still climbing)
+3. full_s42: 0.5126 (step 180)
 4. corr_s42: 0.4844 (step 180)
 5. corr_s456: 0.4406 (step 180)
+6. corrrank_s42: 0.3191 (step 60, early)
+7. corrrank_s456: 0.3069 (step 40, early)
+
+## Convergence assessment (2026-04-21)
+
+**tiebreak_s456** is the only run with enough data to judge:
+- Peak **0.5201 at step 270**, ~3.1 epochs in.
+- Steps 230–370 oscillate between 0.50–0.52 (band width ~0.02).
+- Steps 380–450 drop into 0.47–0.49 band. Best in this range is 0.4951 at step 450.
+- Pattern is consistent with reaching peak then drifting — possibly slight overfitting as LoRA adapters continue to update past useful signal, possibly just noise.
+- **Call:** reached its peak in epoch 3. Additional epochs are not helping and may be hurting. Peak checkpoint (step 270) is the one to use for eval.
+
+**tiebreak_s42** still climbing: steps 90–150 span 0.50–0.52, latest 0.5186 at step 150. Following s456's trajectory suggests peak around step 250–300, so another ~100 steps (~30 h) of useful training remaining.
+
+**full_s42** still climbing at step 180 (peak 0.5126 at latest eval). Composite reward tends to saturate later than correctness-only (prior experiment); likely not at peak yet.
+
+**corr_s42** slowed but still climbing (180:0.4844, 190:0.4796 — first slight dip). Probably near peak.
+
+**corr_s456** oscillating 0.40–0.44 since step 130. Peak 0.4406 at step 180, dropped to 0.4105 at 190. Looks near peak with high oscillation.
+
+**corrrank_s{42,456}** (ablation) still early at step 50–60, stuck around 0.28–0.32. Well below tiebreak at matched step (0.40+ for tiebreak, 0.31 for corrrank). Suggests the rank-advantage alone is NOT capturing the gain — the faith-tiebreaker is doing real work.
+
+### Summary
+
+- **tiebreak_s456:** converged (past peak), peak 0.5201 at step 270.
+- **tiebreak_s42:** not yet converged, projected peak ~0.52 in another 100–150 steps.
+- **full_s42, corr_s42, corr_s456:** approaching peak, another 20–50 steps of possibly-useful training.
+- **corrrank:** too early to call, but matched-step numbers already signal the tiebreaker specifically matters (not just rank advantages).
+
+For the paper: use step 270 checkpoint of tiebreak_s456 and the eventual peak of tiebreak_s42 (~step 300) as the primary numbers.
 
 ## Mechanism analysis
 
