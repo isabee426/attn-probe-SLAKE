@@ -60,6 +60,49 @@ Best-val-correct checkpoint used for each run.
 
 Mechanism hypothesis: rank-based advantage with faith-tiebreaker preserves the pure-correctness objective exactly (no reward contamination from faith signal), so the policy does not chase faith patterns that bind to training-distribution artifacts. Corr_only has the same invariance but lacks the dense gradient signal from tiebreaker, so converges to a lower-quality solution.
 
+## Run inventory
+
+Seven training runs across three method families and two random seeds. All runs share the same base model (Qwen3-VL-2B-Thinking + LoRA r=16), dataset (SLAKE organ-only, 1888 train / 188 val), 8 rollouts per prompt, token-F1 reward, `drop_unformatted=true`, 5 planned epochs, AdamW lr=1e-5 with cosine schedule. They differ **only** in (a) how the reward and advantage are computed, and (b) the random seed controlling dataloader shuffling + rollout sampling.
+
+### Method families
+
+- **`corr_only`** — standard GRPO with pure correctness reward (α=1.0). Reward = token-F1 correctness. Advantage = `reward − mean(reward)`. This is the baseline: what you'd implement first if you wanted GRPO on medical VQA.
+
+- **`full` (composite reward)** — GRPO with 70% correctness + 30% faith in the reward magnitude (α=0.7). Reward = `0.7·correctness + 0.3·faith`. Advantage = `reward − mean(reward)`. This is the prior-work design: auxiliary faith signal added to the primary reward, letting faith trade off against correctness.
+
+- **`tiebreaker`** (the new method) — correctness is the reward (α=1.0, for logging only), but the advantage is computed as a centered rank over `(correctness, faith)` lexicographic sort. Faith never enters the reward magnitude; it only disambiguates rollouts that tie on correctness. The correctness ordering cannot be flipped by faith.
+
+- **`corrrank`** (ablation) — GOPO-style rank-based advantage on correctness alone. Same rank magnitudes as `tiebreaker`, but the sort key is just correctness (no faith, no tiebreaking beyond Python's stable sort on tied rollouts). Isolates the contribution of the rank-advantage structure from the contribution of the faith tiebreaker.
+
+### The seven runs
+
+| Run | Method | Seed | Role |
+|---|---|---|---|
+| `corr_s42` | corr_only | 42 | Baseline on the "strong" seed (s42 tends to produce higher-quality rollouts early). Primary matched-seed reference for `tiebreak_s42`. |
+| `corr_s456` | corr_only | 456 | Baseline on the "weak" seed (s456 tends to struggle more on early exploration). Primary matched-seed reference for `tiebreak_s456`. |
+| `full_s42` | full (α=0.7) | 42 | Prior-work baseline. Shows how composite reward performs on the strong seed — a stronger competitor than `corr_s42`. |
+| `tiebreak_s42` | tiebreaker | 42 | Main method on the strong seed. Matched-seed comparison against `corr_s42` (same seed, different advantage rule) isolates the tiebreaker's contribution. |
+| `tiebreak_s456` | tiebreaker | 456 | Main method on the weak seed. Matched against `corr_s456`. First seed completed; has test-set eval. |
+| `corrrank_s42` | corrrank | 42 | Ablation on strong seed. Matched against `tiebreak_s42` — same advantage magnitudes, difference is only whether faith breaks ties. |
+| `corrrank_s456` | corrrank | 456 | Ablation on weak seed. Matched against `tiebreak_s456`. |
+
+### What each comparison tells us
+
+- **`tiebreak_{seed}` vs `corr_{seed}`** — does the method beat the pure baseline? Matched seed, so any difference is the method (rank advantage + tiebreaker) vs standard mean-subtracted advantage.
+- **`tiebreak_{seed}` vs `full_{seed}`** — does the method beat the prior-work alternative (composite reward)? Tests whether keeping faith out of reward magnitude is better than mixing it in.
+- **`tiebreak_{seed}` vs `corrrank_{seed}`** — does the faith tiebreaker specifically matter, or would pure rank advantages (GOPO-style) already capture the gain? This is the critical ablation — if corrrank ties or beats tiebreak, the contribution shrinks from "tiebreaker" to "GOPO for medical VQA."
+- **`{method}_s42` vs `{method}_s456`** — does the method's benefit replicate across seeds? Seed 42 and seed 456 differ ~0.05 in corr_only peak, indicating real seed variance; replicating across both rules out "one lucky seed."
+
+### Why these four conditions
+
+The four-way comparison is the minimum needed to defend the tiebreaker construction:
+1. `corr_only` = baseline ("does GRPO work at all on this task?")
+2. `full` = standard prior approach ("how much better are we than adding faith to reward?")
+3. `tiebreak` = proposed method ("does the construction help?")
+4. `corrrank` = the one ablation a reviewer will demand ("is it really the tiebreaker or just the ranks?")
+
+Without corrrank, a reviewer can argue the tiebreaker result reduces to GOPO's contribution. With corrrank, we can isolate the tiebreaker's specific effect. If corrrank lags tiebreak meaningfully at matched step, the faith-tiebreaker construction is doing real work beyond what rank advantage alone provides.
+
 ## Val trajectories (correctness only, token F1)
 
 Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the run has not yet reached that step.
