@@ -40,20 +40,15 @@ Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest ev
 | Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
 |---|---|---|---|---|---|---|---|
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
-| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 @step 180 | −0.0925 |
-| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 @step 180 | −0.0763 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 @step ~220 | −0.0339 |
-| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 @step 270 | **+0.0412** |
+| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.0925 |
+| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4430 | — |
+| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 | −0.0763 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5542** | −0.0339 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 | **+0.0412** |
+| corrrank (ablation) | 42 | pending | — | — | — | 0.3401 | — |
+| corrrank (ablation) | 456 | pending | — | — | — | 0.3109 | — |
 
-**Other conditions (val peak only, test eval pending):**
-
-| Condition | Seed | Val peak | Step | Status |
-|---|---|---|---|---|
-| corr_only | 456 | 0.4430 | 180 | test eval running in evalB queue |
-| corrrank (ablation) | 42 | 0.3401 | 80 | still training, well behind tiebreak at matched step |
-| corrrank (ablation) | 456 | 0.3109 | 90 | still training |
-
-corr_s42 test eval used the step-100 best_correct checkpoint (the test eval ran before the step-180 peak was reached); a refreshed eval at step-180 is running. Tiebreaker_s42 test eval used the best_correct at the time the eval kicked off; val has since climbed to 0.5542 (a re-eval against the current best_correct is worth running). Tiebreaker_s456 val peaked at 0.5201 at step 270 but the test eval used the step-170 checkpoint (val 0.4928 at that moment) — test F1 was 0.5340 even on that earlier checkpoint, so refreshing on step-270 could only improve it.
+Test eval notes: corr_s42's test F1 used the step-100 best_correct checkpoint (eval ran before the step-180 peak); a refreshed eval at the current best_correct is running. Tiebreak_s42 test F1 was recorded while val was still climbing — current val peak (0.5542) is higher than at eval time, so a re-eval could improve this number. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 then) — the step-270 checkpoint (val 0.5201) hasn't been test-eval'd yet.
 
 \* corr_s42 number uses the earlier step-100 best_correct eval; a refreshed eval at step-180 best_correct is running and should land soon (evalB in progress).
 
@@ -137,23 +132,23 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 | 40 | 0.3381 | 0.3021 | 0.3092 | 0.2955 | 0.3893 | 0.3144 | 0.3069 |
 | 50 | 0.3733 | 0.3070 | 0.3185 | 0.3448 | 0.4040 | 0.3191 | 0.2790 |
 | 60 | 0.3745 | 0.3175 | 0.3430 | 0.3931 | 0.4160 | 0.3191 | 0.2844 |
-| 70 | 0.3524 | 0.3596 | 0.3945 | 0.3997 | 0.4317 |  |  |
-| 80 | 0.4168 | 0.3232 | 0.4258 | 0.4145 | 0.4356 |  |  |
-| 90 | 0.4070 | 0.3430 | 0.4152 | 0.4151 | 0.5030 |  |  |
+| 70 | 0.3524 | 0.3596 | 0.3945 | 0.3997 | 0.4317 | 0.3016 | 0.3109 |
+| 80 | 0.4168 | 0.3232 | 0.4258 | 0.4145 | 0.4356 | 0.3401 | 0.3062 |
+| 90 | 0.4070 | 0.3430 | 0.4152 | 0.4151 | 0.5030 |  | 0.3077 |
 | 100 | 0.4106 | 0.3822 | 0.4498 | 0.4521 | 0.5122 |  |  |
 | 110 | 0.4163 | 0.3600 | 0.4473 | 0.4364 | 0.5077 |  |  |
 | 120 | 0.4271 | 0.3962 | 0.4428 | 0.4798 | 0.5015 |  |  |
 | 130 | 0.4442 | 0.4013 | 0.4757 | 0.4651 | 0.5148 |  |  |
 | 140 | 0.4611 | 0.4222 | 0.4822 | 0.4766 | 0.4911 |  |  |
 | 150 | 0.4652 | 0.3990 | 0.4767 | 0.4689 | 0.5186 |  |  |
-| 160 | 0.4689 | 0.4083 | 0.4815 | 0.4844 |  |  |  |
-| 170 | 0.4792 | 0.4332 | 0.5020 | 0.4928 |  |  |  |
-| 180 | 0.4844 | 0.4406 | 0.5126 | 0.4720 |  |  |  |
-| 190 | 0.4796 | 0.4105 |  | 0.4705 |  |  |  |
-| 200 |  |  |  | 0.4795 |  |  |  |
-| 210 |  |  |  | 0.4903 |  |  |  |
-| 220 |  |  |  | 0.4826 |  |  |  |
-| 230 |  |  |  | 0.5023 |  |  |  |
+| 160 | 0.4689 | 0.4083 | 0.4815 | 0.4844 | 0.5328 |  |  |
+| 170 | 0.4792 | 0.4332 | 0.5020 | 0.4928 | 0.5448 |  |  |
+| 180 | 0.4844 | 0.4406 | 0.5126 | 0.4720 | 0.5439 |  |  |
+| 190 | 0.4796 | 0.4105 | 0.4767 | 0.4705 | 0.5294 |  |  |
+| 200 | 0.4708 | 0.4430 | 0.4941 | 0.4795 | 0.5369 |  |  |
+| 210 | 0.4621 | 0.4256 |  | 0.4903 | 0.5342 |  |  |
+| 220 |  |  |  | 0.4826 | 0.5393 |  |  |
+| 230 |  |  |  | 0.5023 | **0.5542** |  |  |
 | 240 |  |  |  | 0.5145 |  |  |  |
 | 250 |  |  |  | 0.5064 |  |  |  |
 | 260 |  |  |  | 0.5052 |  |  |  |
@@ -176,6 +171,7 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 | 430 |  |  |  | 0.4691 |  |  |  |
 | 440 |  |  |  | 0.4692 |  |  |  |
 | 450 |  |  |  | 0.4951 |  |  |  |
+| 460 |  |  |  | 0.5003 |  |  |  |
 
 ### Matched-seed comparisons
 
@@ -190,13 +186,13 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 
 ### Cross-method peak val correctness
 
-1. tiebreak_s456: **0.5201** (step 270, ~3 epochs deep)
-2. tiebreak_s42: 0.5186 (step 150, still climbing)
+1. **tiebreak_s42: 0.5542** (step 230, still climbing)
+2. tiebreak_s456: 0.5201 (step 270, past peak)
 3. full_s42: 0.5126 (step 180)
 4. corr_s42: 0.4844 (step 180)
-5. corr_s456: 0.4406 (step 180)
-6. corrrank_s42: 0.3191 (step 60, early)
-7. corrrank_s456: 0.3069 (step 40, early)
+5. corr_s456: 0.4430 (step 200)
+6. corrrank_s42: 0.3401 (step 80)
+7. corrrank_s456: 0.3109 (step 70)
 
 ## Convergence assessment (2026-04-21)
 
