@@ -39,18 +39,16 @@ Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest ev
 
 | Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
 |---|---|---|---|---|---|---|---|
-| zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
-| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 (step 180) | −0.0925 |
-| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4430 (step 200) | — |
+| corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (step 220) | −0.0858 |
+| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4481 (step 220) | — |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (step 180) | −0.0763 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5542 (step 230)** | −0.0339 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5828 (step 290, still climbing)** | −0.0625 |
 | **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (step 270) | **+0.0412** |
 | corrrank (ablation) | 42 | pending | — | — | — | 0.3401 (step 80) | — |
-| corrrank (ablation) | 456 | pending | — | — | — | 0.3109 (step 70) | — |
+| corrrank (ablation) | 456 | pending | — | — | — | 0.3308 (step 100) | — |
+| zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 
-Test eval notes: corr_s42's test F1 used the step-100 best_correct checkpoint (eval ran before the step-180 peak); a refreshed eval at the current best_correct is running. Tiebreak_s42 test F1 was recorded while val was still climbing — current val peak (0.5542) is higher than at eval time, so a re-eval could improve this number. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 then) — the step-270 checkpoint (val 0.5201) hasn't been test-eval'd yet.
-
-\* corr_s42 number uses the earlier step-100 best_correct eval; a refreshed eval at step-180 best_correct is running and should land soon (evalB in progress).
+Test eval notes: tiebreak_s42 test F1 was recorded on the step-250 best_correct; current best is step-290 (val 0.5828), a refresh is running and should bump this number. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 then); the step-270 peak (val 0.5201) has not been refreshed yet (already-reported 0.5340 is from the weaker checkpoint).
 
 ### Deltas
 
@@ -58,14 +56,14 @@ Test eval notes: corr_s42's test F1 used the step-100 best_correct checkpoint (e
 | Comparison | Absolute F1 | Relative |
 |---|---|---|
 | vs. composite-reward (full_s42) | +0.0977 | +22.4% |
-| vs. corr_only (corr_s42) | +0.1421 | +36.3% |
+| vs. corr_only (corr_s42) | +0.1254 | +30.7% |
 | vs. zero_shot | +0.2352 | +78.7% |
 
 **tiebreaker_s42 vs baselines (matched-seed s42):**
 | Comparison | Absolute F1 | Relative |
 |---|---|---|
 | vs. composite-reward | +0.0840 | +19.2% |
-| vs. corr_only | +0.1284 | +32.8% |
+| vs. corr_only | +0.1117 | +27.3% |
 
 **Gap split by question type (tiebreak_s456 vs full_s42):** Tiebreak gains +0.130 on closed Q, +0.077 on open Q. Binary/discriminative questions show the largest method effect.
 

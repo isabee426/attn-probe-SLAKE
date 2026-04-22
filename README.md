@@ -8,17 +8,17 @@ Full SLAKE English test set (1061 questions, including non-organ questions the m
 
 | Model | Seed | Test F1 | Exact | Closed Q | Open Q | Val peak (step) | Val→Test |
 |---|---|---|---|---|---|---|---|
-| zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
-| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4944 (220) | −0.102 |
+| corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (220) | −0.086 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (180) | −0.076 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5722 (270, still climbing)** | −0.052 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5828 (290, still climbing)** | −0.062 |
 | **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (270) | **+0.041** |
+| zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 
 **Tiebreaker (s456) vs baselines (all matched on seed 42):**
 - vs composite: **+0.0977 absolute F1, +22.4% relative**
-- vs corr_only: **+0.1421 absolute F1, +36.3% relative**
+- vs corr_only: **+0.1254 absolute F1, +30.7% relative**
 
-**Generalization pattern:** composite and corr_only overfit the organ-only training distribution (val → test drops 0.08–0.10 F1). Tiebreaker does not — val → test is essentially flat or rising.
+**Generalization pattern:** composite and corr_only overfit the organ-only training distribution (val → test drops 0.08–0.09 F1). Tiebreaker does not: val → test is essentially flat for s42 (−0.06) and rising for s456 (+0.04).
 
 ## The method
 
