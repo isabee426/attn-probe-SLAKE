@@ -13,10 +13,10 @@ A new construction — using the probe as an **ordinal tiebreaker** in rank-base
 | Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
 |---|---|---|---|---|---|---|---|
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
-| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.093 |
-| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 | −0.076 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 | −0.034 |
-| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 | **+0.041** |
+| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 (step 180) | −0.093 |
+| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (step 180) | −0.076 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 (step 230) | −0.034 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (step 270) | **+0.041** |
 
 corr_s42 test eval used the step-100 best_correct checkpoint; a refreshed eval at step-180 is running. corr_s456 and corrrank test evals are pending (runs not yet converged or eval in queue). Table will be updated when those land. Tiebreaker_s42 val peak is still climbing as the run completes epoch 2 — 0.5542 is the latest peak; the test eval above used a slightly earlier best_correct checkpoint. Tiebreaker_s456 val peak 0.5201 is at step 270; the test eval used the step-170 checkpoint (val 0.4928).
 
