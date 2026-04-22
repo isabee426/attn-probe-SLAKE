@@ -40,12 +40,13 @@ Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest ev
 | Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
 |---|---|---|---|---|---|---|---|
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
-| corr_only (α=1.0) | 42 | 0.3919* | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.0925 |
-| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4406 | — |
-| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 | −0.0763 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5328 | −0.0125 |
-| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.4928 (step-170 checkpoint eval'd) | **+0.0412** |
-| corrrank_s{42,456} | — | pending | — | — | — | (still training, ~step 60–70) | — |
+| corr_only (α=1.0) | 42 | 0.3919* | 396/1061 | 0.5365 | 0.2986 | 0.4844 @step 180 | −0.0925 |
+| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4430 @step 180 | — |
+| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 @step 180 | −0.0763 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 @step ~220 (still climbing) | −0.0339 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 @step 270 (eval'd on earlier ckpt at 0.4928) | **+0.0412** |
+| corrrank (ablation) | 42 | pending | — | — | — | 0.3401 @step 80 (still training, well behind tiebreak) | — |
+| corrrank (ablation) | 456 | pending | — | — | — | 0.3109 @step 90 (still training) | — |
 
 \* corr_s42 number uses the earlier step-100 best_correct eval; a refreshed eval at step-180 best_correct is running and should land soon (evalB in progress).
 

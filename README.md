@@ -14,9 +14,10 @@ A new construction — using the probe as an **ordinal tiebreaker** in rank-base
 |---|---|---|---|---|---|---|---|
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 | corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.093 |
+| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4430 | — |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 | −0.076 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5328 | −0.012 |
-| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 | **+0.014** |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 (still climbing) | −0.034 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (eval'd on earlier ckpt at 0.4928 val) | **+0.041** |
 
 corr_s42 number uses the earlier step-100 best_correct eval; a refreshed eval at step-180 best_correct is running (expected within hours). corr_s456 eval pending.
 
