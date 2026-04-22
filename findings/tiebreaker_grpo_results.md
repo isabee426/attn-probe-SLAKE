@@ -42,7 +42,7 @@ Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest ev
 | corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (step 220) | −0.0858 |
 | corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4516 (step 230) | −0.0063 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (step 180) | −0.0763 |
-| **tiebreaker (ours)** | 42 | **0.5218** | **554/1061** | **0.7019** | **0.4056** | **0.6190 (step 570, latest peak)** | refresh on step-570 ckpt pending |
+| **tiebreaker (ours)** | 42 | **0.5472** | **579/1061** | **0.6635** | **0.4722** | **0.6190 (step 570, sweep peak)** | −0.0718 |
 | **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (step 270) | **+0.0412** |
 | corrrank (ablation) | 42 | pending | — | — | — | 0.4061 (step 180) | — |
 | corrrank (ablation) | 456 | pending | — | — | — | 0.3602 (step 200) | — |
@@ -71,11 +71,11 @@ The tiebreaker's SLAKE-test gain over corr_only replicates on VQARAD OOD (+0.12 
 | vs. corr_only (corr_s42) | +0.1254 | +30.7% |
 | vs. zero_shot | +0.2352 | +78.7% |
 
-**tiebreaker_s42 vs baselines (matched-seed s42):**
+**tiebreaker_s42 vs baselines (matched-seed s42, updated with step-570 eval):**
 | Comparison | Absolute F1 | Relative |
 |---|---|---|
-| vs. composite-reward | +0.0840 | +19.2% |
-| vs. corr_only | +0.1117 | +27.3% |
+| vs. composite-reward | +0.1109 | +25.4% |
+| vs. corr_only | +0.1386 | +33.9% |
 
 **Gap split by question type (tiebreak_s456 vs full_s42):** Tiebreak gains +0.130 on closed Q, +0.077 on open Q. Binary/discriminative questions show the largest method effect.
 

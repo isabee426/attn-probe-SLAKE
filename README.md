@@ -11,7 +11,7 @@ Full SLAKE English test set (1061 questions, including non-organ questions the m
 | corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (220) | −0.086 |
 | corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4516 (230) | −0.006 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (180) | −0.076 |
-| **tiebreaker (ours)** | 42 | **0.5218** | **554/1061** | **0.7019** | **0.4056** | **0.6190 (570, latest peak)** | refresh on step-570 ckpt running |
+| **tiebreaker (ours)** | 42 | **0.5472** | **579/1061** | **0.6635** | **0.4722** | **0.6190 (570, sweep peak)** | −0.072 |
 | **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (270) | **+0.041** |
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 
@@ -25,9 +25,15 @@ Full SLAKE English test set (1061 questions, including non-organ questions the m
 | **tiebreaker (s42)** | **0.4564** | **199/451** | **+0.118 (+34.8% relative)** |
 | **tiebreaker (s456)** | **0.4644** | **202/451** | **+0.126 (+37.2% relative)** |
 
-**Tiebreaker (s456) vs baselines (all matched on seed 42, SLAKE test):**
+**SLAKE test deltas (tiebreaker vs baselines, matched seed 42):**
+- tiebreak_s42 vs composite (s42): **+0.1109 absolute F1, +25.4% relative**
+- tiebreak_s42 vs corr_only (s42): **+0.1386 absolute F1, +33.9% relative**
+
+**Mixed-seed comparisons (tiebreak_s456 vs s42 baselines):**
 - vs composite: **+0.0977 absolute F1, +22.4% relative**
 - vs corr_only: **+0.1254 absolute F1, +30.7% relative**
+
+**Checkpoint selection note (tiebreak_s42):** the step-570 checkpoint (val 0.6190) has a different closed/open profile than the earlier step-290 checkpoint (val 0.5828): closed-Q F1 regressed slightly (0.7019 → 0.6635), open-Q F1 rose substantially (0.4056 → 0.4722). Net test F1 is higher (0.5472 vs 0.5218) because open-Q is the majority of the test set. The tiebreaker's deeper-training checkpoints trade some yes/no precision for better open-ended reasoning.
 
 **Generalization pattern:** composite and corr_only overfit the organ-only training distribution (val → test drops 0.08–0.09 F1). Tiebreaker does not: val → test is flat or rising. The pattern replicates on OOD: composite underperforms corr_only on VQARAD (−0.013 F1), while tiebreaker gains +0.12 F1 over corr_only across both seeds.
 
