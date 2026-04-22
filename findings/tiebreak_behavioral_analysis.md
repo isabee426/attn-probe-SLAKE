@@ -31,6 +31,15 @@ Correctness-only GRPO is the standard baseline a practitioner would implement fi
 
 Questions where the tiebreaker produced a correct answer and the corr_only baseline did not. 151 total examples of this pattern; sample below.
 
+**Why corr_only_s42 failed on these questions:**
+
+- No `<answer>` tags emitted: **79** (52%)
+- Hit max_new_tokens without finishing: **16** (11%)
+- Overspecified (answer contains gold but includes extra tokens): **3** (2%)
+- Wrong content (genuinely different answer): **53** (35%)
+
+**Roughly 63% of corr_only's losses are format or truncation failures** (no answer tags emitted, or reasoning runs past the 512-token budget). Corr_only does learn format compliance during training, but does not learn it as *completely* as tiebreaker does. The tiebreaker's denser gradient (2.5× more gradient-carrying updates per epoch, from non-zero advantages on tied batches) drives faster convergence on concise, tag-compliant answers. The remaining 35% of corr_only's losses are wrong-content errors, often from longer reasoning chains that drift into incorrect conclusions — tiebreaker's shorter rollouts (~300 chars mean vs corr_only's ~900) commit earlier and avoid this drift.
+
 **1. [OPEN] What diseases are included in the picture?**
    - Gold: `Pneumonia`
    - tiebreak_s456: `pneumonia` (score 1.00)
