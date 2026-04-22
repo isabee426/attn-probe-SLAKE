@@ -232,14 +232,65 @@ Three reasons correctness-only GRPO underperforms:
 
 Tiebreaker addresses (2) directly: ties in correctness are broken by faith, producing non-zero advantages. Rank-based advantage also addresses (1): ranks span fixed range [−(N−1)/2, +(N−1)/2], giving consistent gradient magnitude regardless of reward distribution.
 
-`corrrank` ablation (running): rank-based advantage on correctness alone (no tiebreaker). Isolates whether rank structure alone is responsible for the gain, or whether the faith-tiebreaker specifically matters. Early data (step 50–60) shows corrrank at ~0.31, well below tiebreak at matched step.
+`corrrank` ablation (running): rank-based advantage on correctness alone (no tiebreaker). Isolates whether rank structure alone is responsible for the gain, or whether the faith-tiebreaker specifically matters. Early data (step 50–80) shows corrrank at 0.29–0.34, well below tiebreak at matched step.
+
+## Why GOPO doesn't win here (the rank-without-tiebreaker failure mode)
+
+GOPO (arXiv 2602.03876, Feb 2026) claims rank-based advantage beats Dr. GRPO's mean-subtracted advantage. Our `corrrank` ablation — which is essentially GOPO applied to token F1 rewards — underperforms Dr. GRPO (`corr_only`) by −0.08 at step 80 (0.3401 vs 0.4168). This isn't contradicting GOPO; it reveals where GOPO's assumptions break.
+
+### GOPO's assumed regime: continuous reward model scores
+
+GOPO's paper tests on tasks with reward-model output as the primary reward (continuous [0, 10] scalars from models like UltraFeedback / LLaMA-Reward-Bench). In that regime:
+
+- **Ties are rare** — continuous scores give unique values with high probability.
+- **Magnitudes are noisy** but **orderings are reliable** — the whole point of GOPO is discarding noisy magnitudes in favor of cleaner ranks.
+
+GOPO's formula: `A_i = 2 − (ρ(i) − 1)·4/(G − 1)` where ρ(i) is the rank of rollout i. The assumption is that ρ(i) reflects *meaningful* ordering.
+
+### Our regime: sparse discrete rewards (token F1)
+
+Token F1 takes values in {0, 0.33, 0.5, 0.67, 1} or similar for open questions, {0, 1} for yes/no. Consequences:
+
+- **Ties are common.** On hard questions, 6 of 8 rollouts often score 0 (all wrong). On easy ones, 5 of 8 score 1.
+- **When rollouts tie, Python's `sorted()` preserves insertion order** (stable sort). So rank ρ(i) = the arbitrary order in which rollouts were sampled.
+- **GOPO's formula then maps arbitrary order to fixed advantages** (+2, +1.43, ..., −2). The policy is trained to prefer rollout 1 over rollout 8 for no real reason. That is **systematic noise in the gradient**.
+
+Dr. GRPO handles ties gracefully: `σ → 0`, advantage → 0 for everyone. No gradient, but no noise either.
+
+### The comparison
+
+| Regime | Dr. GRPO (mean-subtracted) | GOPO (pure rank) |
+|---|---|---|
+| Rollouts differ on reward | Standard advantage; works | Rank-based advantage; works |
+| **Rollouts tie on reward** | **Advantage = 0 (no gradient; wasted)** | **Advantage = rank of arbitrary order (noise gradient; harmful)** |
+
+In the sparse regime, "wasted" beats "harmful." That's why corrrank loses to corr_only here.
+
+### How the tiebreaker extends GOPO
+
+The faith tiebreaker says: *when correctness ties, use the auxiliary probe to produce a meaningful rank ordering.* The rank-based advantage machinery is reused, but the sort key becomes `(correctness, faith)` — so tied-on-correctness rollouts get ranked by faith, which is not arbitrary.
+
+| Regime | Tiebreaker (ours) |
+|---|---|
+| Rollouts differ on correctness | Advantage = rank on correctness (correctness dominates, same as GOPO) |
+| **Rollouts tie on correctness** | **Advantage = rank on faith (meaningful ordering from probe)** |
+
+This restores GOPO's "reliable ordering" assumption in a regime where it would otherwise fail. The tiebreaker is the mechanism that makes rank-based advantages work on sparse discrete rewards.
+
+### Implication for the method's positioning
+
+We are not competing with GOPO — we are **extending it to sparse-reward settings.** The paper's related-work claim is:
+
+> *"GOPO (Liu et al., 2026) proposes rank-based advantages as a de-noising mechanism when reward scores are continuous and approximately ordered. In sparse-reward settings where rollouts frequently tie, stable-sort-on-ties assigns arbitrary ranks that inject noise into the policy gradient (our corrrank ablation: 0.34 vs 0.42 for Dr. GRPO at matched step). Our tiebreaker construction extends GOPO to this regime by using an auxiliary signal to provide meaningful ordering over tied rollouts."*
 
 ## Related work
 
-- **GOPO** (Group Ordinal Policy Optimization, arXiv 2602.03876, Feb 2026): rank-based advantage in GRPO with single scalar reward. No compositional or tiebreaker mechanism.
+- **GOPO** (Group Ordinal Policy Optimization, arXiv 2602.03876, Feb 2026): rank-based advantage in GRPO with single scalar reward. Targets continuous reward-model outputs. Fails on sparse token-F1 rewards (see corrrank ablation).
 - **FaithRL** (arXiv 2602.05897, Feb 2026): step-level faithfulness reward via external PRM + truncated resampling. Different domain (text QA), different mechanism (additive composite + contrastive).
+- **DAPO** (Ma et al., 2025): dynamic sampling to eliminate all-tied batches via oversampling. Different fix for the same advantage-collapse problem.
+- **GDPO** (2601.05242, Jan 2026): decoupled normalization of multi-reward advantages. Different problem (multi-reward) but related concern about advantage collapse.
 
-Our construction — compositional lex-rank advantage with ordinal auxiliary tiebreaker — occupies the gap between these two lines of work.
+Our construction — compositional lex-rank advantage with ordinal auxiliary tiebreaker — sits at the intersection of these three lines of work: keeps GOPO's rank structure, addresses the advantage-collapse problem DAPO targets, uses an auxiliary signal like FaithRL but without reward-magnitude contamination.
 
 ## Caveats (as of 2026-04-21)
 
