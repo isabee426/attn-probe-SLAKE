@@ -40,13 +40,20 @@ Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest ev
 | Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
 |---|---|---|---|---|---|---|---|
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
-| corr_only (α=1.0) | 42 | 0.3919* | 396/1061 | 0.5365 | 0.2986 | 0.4844 @step 180 | −0.0925 |
-| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4430 @step 180 | — |
+| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 @step 180 | −0.0925 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 @step 180 | −0.0763 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 @step ~220 (still climbing) | −0.0339 |
-| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 @step 270 (eval'd on earlier ckpt at 0.4928) | **+0.0412** |
-| corrrank (ablation) | 42 | pending | — | — | — | 0.3401 @step 80 (still training, well behind tiebreak) | — |
-| corrrank (ablation) | 456 | pending | — | — | — | 0.3109 @step 90 (still training) | — |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 @step ~220 | −0.0339 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 @step 270 | **+0.0412** |
+
+**Other conditions (val peak only, test eval pending):**
+
+| Condition | Seed | Val peak | Step | Status |
+|---|---|---|---|---|
+| corr_only | 456 | 0.4430 | 180 | test eval running in evalB queue |
+| corrrank (ablation) | 42 | 0.3401 | 80 | still training, well behind tiebreak at matched step |
+| corrrank (ablation) | 456 | 0.3109 | 90 | still training |
+
+corr_s42 test eval used the step-100 best_correct checkpoint (the test eval ran before the step-180 peak was reached); a refreshed eval at step-180 is running. Tiebreaker_s42 test eval used the best_correct at the time the eval kicked off; val has since climbed to 0.5542 (a re-eval against the current best_correct is worth running). Tiebreaker_s456 val peaked at 0.5201 at step 270 but the test eval used the step-170 checkpoint (val 0.4928 at that moment) — test F1 was 0.5340 even on that earlier checkpoint, so refreshing on step-270 could only improve it.
 
 \* corr_s42 number uses the earlier step-100 best_correct eval; a refreshed eval at step-180 best_correct is running and should land soon (evalB in progress).
 
