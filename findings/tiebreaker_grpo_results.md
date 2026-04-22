@@ -48,7 +48,7 @@ Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest ev
 | corrrank (ablation) | 456 | pending | — | — | — | 0.3602 (step 200) | — |
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 
-Test eval notes: the 0.5218 tiebreak_s42 number is a refresh against the earlier best_correct checkpoint (around step 290–370). The current best_correct on disk is step 570 (val 0.6190), and a second refresh eval on that checkpoint is running. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 at that time); the step-270 peak (val 0.5201) has not been refreshed yet, so the reported 0.5340 is from the weaker checkpoint.
+Test eval notes: the 0.5472 tiebreak_s42 number is from a refresh eval against the step-570 best_correct checkpoint (val 0.6190). An earlier eval against an intermediate (~step-290) checkpoint produced 0.5218 with a different closed/open profile: closed-Q F1 was higher (0.7019 vs 0.6635) while open-Q F1 was lower (0.4056 vs 0.4722). The later checkpoint trades some yes/no precision for substantially better open-ended reasoning. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 at that time); the step-270 peak (val 0.5201) has not been refreshed yet, so the reported 0.5340 is from the weaker checkpoint.
 
 ### Out-of-domain test (VQARAD, 451 questions — model never trained on this dataset)
 
