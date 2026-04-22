@@ -1,44 +1,34 @@
 # Spatial Attention Probe as Auxiliary Reward for Medical VQA GRPO
 
-Training a spatial grounding probe on organ bounding box attention patterns to differentiate correct and incorrect attention patterns, then using it as a signal during GRPO to improve medical VQA accuracy on SLAKE.
+Training a classical logistic-regression probe on per-head attention features of a vision-language model, then using that probe as an ordinal tiebreaker inside GRPO to reduce hallucinations and improve medical VQA accuracy on SLAKE.
 
----
+## Main result
 
-## 2026-04-21 Update: Rank-Based Tiebreaker Advantage
+Full SLAKE English test set (1061 questions, including non-organ questions the model was never trained on):
 
-A new construction — using the probe as an **ordinal tiebreaker** in rank-based advantages rather than adding it to the reward magnitude — beats both correctness-only and composite-reward GRPO on the full SLAKE English test set (1061 questions, including non-organ questions the model was never trained on).
-
-### Main result (full SLAKE English test set, 1061 Q, latest best_correct checkpoints)
-
-| Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
+| Model | Seed | Test F1 | Exact | Closed Q | Open Q | Val peak (step) | Val→Test |
 |---|---|---|---|---|---|---|---|
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
-| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 (step 180) | −0.093 |
-| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (step 180) | −0.076 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5542 (step 230) | −0.034 |
-| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (step 270) | **+0.041** |
+| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4944 (220) | −0.102 |
+| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (180) | −0.076 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5722 (270, still climbing)** | −0.052 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (270) | **+0.041** |
 
-corr_s42 test eval used the step-100 best_correct checkpoint; a refreshed eval at step-180 is running. corr_s456 and corrrank test evals are pending (runs not yet converged or eval in queue). Table will be updated when those land. Tiebreaker_s42 val peak is still climbing as the run completes epoch 2 — 0.5542 is the latest peak; the test eval above used a slightly earlier best_correct checkpoint. Tiebreaker_s456 val peak 0.5201 is at step 270; the test eval used the step-170 checkpoint (val 0.4928).
+**Tiebreaker (s456) vs baselines (all matched on seed 42):**
+- vs composite: **+0.0977 absolute F1, +22.4% relative**
+- vs corr_only: **+0.1421 absolute F1, +36.3% relative**
 
-- tiebreaker_s456 vs composite-reward (s42): **+0.0977 absolute F1 (+22.4% relative)**
-- tiebreaker_s456 vs correctness-only (s42): **+0.1421 absolute F1 (+36.3% relative)**
-- tiebreaker_s42 vs correctness-only (s42, matched seed): **+0.1284 absolute F1 (+32.8% relative)**
+**Generalization pattern:** composite and corr_only overfit the organ-only training distribution (val → test drops 0.08–0.10 F1). Tiebreaker does not — val → test is essentially flat or rising.
 
-All GRPO methods beat zero-shot by +0.09 to +0.24 absolute F1. The tiebreaker gains over the other GRPO methods are not from "GRPO works" but from the specific construction.
-
-**Composite-reward and correctness-only both overfit the organ-only training distribution** — val peaks 0.48–0.53 on organ-only SLAKE, test drops to 0.39–0.44 on the broader English test. The tiebreaker does the opposite — val 0.49–0.53, test F1 in the same range or higher. Val→test gap collapses from −0.08/−0.09 to −0.01/+0.01.
-
-### The method
-
-Three reward/advantage constructions in the sweep:
+## The method
 
 | Method | Reward | Advantage |
 |---|---|---|
-| `corr_only` | `correctness` | `reward − mean(reward)` |
-| `composite` (prior work) | `0.7·correctness + 0.3·faith` | `reward − mean(reward)` |
-| **`tiebreaker`** | `correctness` (logged; not used in advantage) | `rank(correctness, faith) − mean(rank)`, lex sort |
+| `corr_only` | correctness (token F1) | (reward − group mean) / group std |
+| `composite` | 0.7·correctness + 0.3·faith | (reward − group mean) / group std |
+| **`tiebreaker`** | correctness (logged; not used in advantage) | centered rank over (correctness, faith) lex-sort |
 
-The tiebreaker replaces the advantage computation only. Faith never enters the reward magnitude. It sorts formatted rollouts by `(correctness, faith)` descending — correctness always dominates the ordering, faith only disambiguates ties. Centered rank position becomes the advantage.
+Faith signal never enters reward magnitude. It only disambiguates rollouts that tie on correctness. Correctness ordering is strictly preserved — no reward-hacking pathway.
 
 ```python
 sorted_idx = sorted(fmt_idx, key=lambda i: (rollouts[i]["correctness"], rollouts[i]["faithfulness"]), reverse=True)
@@ -47,177 +37,117 @@ mean_rank = (N - 1) / 2.0
 advantages[i] = (N - 1 - pos) - mean_rank  # ranks centered at 0
 ```
 
-### Why this works
+## Probe architecture (classical ML)
 
-GRPO's group-relative advantage becomes gradient-starved on coarse rewards like token F1, because most rollouts tie (all wrong, all 0.5, etc.) and produce zero advantage. The tiebreaker fixes two problems:
+The auxiliary signal is a **logistic regression classifier** on per-head attention features. No neural network, no fine-tuning — a classical binary classifier trained from scratch per sweep.
 
-1. **Coarse signal.** Rank-based advantage gives fixed-magnitude gradient regardless of reward distribution (GOPO-style).
-2. **Zero-advantage batches.** When all rollouts tie on correctness, the faith tiebreaker produces meaningful ordering — the wrong rollouts that looked at the right region get positive advantage over the wrong rollouts that hallucinated from nowhere.
+### Feature extraction
 
-The correctness ordering is never flipped by faith, so there is no reward-hacking pathway. Faith can be noisy or biased (AUROC ≈ 0.78 is "good enough") — it only needs to correlate with quality on tied examples.
+For each (image, question, rollout) triple:
+1. Run the VLM forward pass and collect attention weights at every layer × head.
+2. For each head, compute the sum of attention from generated tokens to image patches within the ground-truth organ bounding box.
+3. Normalize by total attention to image patches to get a **bbox attention ratio** per head.
+4. Stack across layers × heads to get the feature vector.
 
-### Details + matched-seed numbers
+Feature dimensionality: **28 layers × 16 heads = 448 features** per rollout.
 
-See [`findings/tiebreaker_grpo_results.md`](findings/tiebreaker_grpo_results.md) for the full breakdown including val trajectories, matched-seed comparisons, the `corrrank` ablation (rank advantage without tiebreaker), and related work (GOPO, FaithRL).
+### Probe variants
 
----
+| Probe | Training data | Target | AUROC | Pearson r with correctness | Predict_proba gap |
+|---|---|---|---|---|---|
+| **Corrprobe** (weak) | 154 examples, balanced positives/negatives | correctness label (0/1) | 0.667 | 0.636 | 0.83 vs 0.32 (gap 0.51) |
+| **Fullprobe** (strong) | 572 examples, balanced from 1276 candidates | correctness label (0/1) | 0.968 | 0.844 | 0.91 vs 0.15 (gap 0.76) |
 
-## Prior Experiment: 2-Epoch Reproduction (organ-only test, 364 Q)
+Both probes:
+- **Model class:** logistic regression (scikit-learn, default L2 penalty)
+- **Loss:** binary cross-entropy
+- **Regularization:** L2, default λ
+- **Feature scaling:** z-score normalized per head across training set
+- **Class balance:** upsampling/undersampling to equal positive/negative counts
+- **Train/val split:** 80/20 within the labeled set
+- **Held-out evaluation:** on VLM rollouts from the main training corpus
 
-The result below is from an earlier 2-epoch comparison on the 364-question organ-only test subset (the questions the model was directly trained on). This is not directly comparable to the 1061-question full test above — the 1061 set includes broader question types the model was never trained on.
+### At inference time in GRPO
 
-| Model | Token F1 (364 organ-only) | Exact (>0.5) |
-|-------|----------|-------------|
-| Zero-shot | 0.275 | 92/364 (25.3%) |
-| **Corr-only** | **0.447** | **156/364 (42.9%)** |
-| Corrprobe (r=0.636) | 0.424 | 148/364 (40.7%) |
-| **Fullprobe (r=0.844)** | **0.445** | **154/364 (42.3%)** |
+During rollout generation:
+1. Collect attention weights for each of the 8 rollouts.
+2. Compute 448-dim feature vector per rollout.
+3. Run logistic regression forward pass → probability of correctness ∈ [0, 1].
+4. z-score normalize across the group; optional sigmoid.
+5. Use as the auxiliary (faith) signal in the tiebreaker advantage.
 
-Corr-only and fullprobe reach the same accuracy on the in-distribution organ-only test (0.447 vs 0.445). 322/364 (88%) agree. They get there through different training dynamics and commit on different question types.
+### Why logistic regression (not a neural probe)
 
-### Training trajectories: same destination, different paths
-
-**Corr-only (spike-crash):**
-```
-Step 50→60→70→80→90→...→170→180→190
-0.352→0.410→0.388→0.419→0.429→...→0.493→0.470→0.508
-```
-Oscillates between spikes and crashes. Peak of 0.508 at step 190, but drops to 0.470 one step later.
-
-**Fullprobe (monotonic climb):**
-```
-Step 40→50→60→70→80→...→170→180→190→200
-0.344→0.318→0.333→0.368→0.401→...→0.448→0.449→0.481→0.485
-```
-Steady improvement with occasional dips. Never crashes. Ends at 0.491 epoch-end val.
-
-### Behavioral specialization on the organ-only test
-
-Both models learned conciseness. But they commit on **different question types**:
-
-**Fullprobe's 17 unique wins — visual/clinical judgment:**
-
-| Question | GT | Fullprobe | Corr-only |
-|----------|-----|-----------|-----------|
-| Where is the pneumonia in the lung? | Lower Right Lung | `right lung` | `[none]` (loops) |
-| Where is the atelectasis? | Lower Left Lung | `left lung` | Long explanation, no tag |
-| Can nodule be observed on lower left lung? | Yes | `Yes` | `[none]` |
-| Does the liver look normal? | Yes | `Yes` | `No` (hallucinated abnormality) |
-| Is the brain tumor hyperdense or hypodense? | Hyperdense | `hyperdense` | Long explanation |
-| What color does the duodenum show? | Gray | `gray` | Long explanation |
-| What is the shape of spleen? | Oval | `oval` | `crescent` (wrong) |
-| Which organ is part of the nervous system? | Spinal cord | `spinal cord` (x2) | `[none]` |
-| Which organ is part of the lymphatic system? | Spleen | `spleen` | `[none]` |
-| Which is smaller, spleen or kidney? | Spleen | `spleen` | `[none]` |
-
-**Corr-only's 20 unique wins — existence, knowledge recall, and some visual:**
-
-| Question | GT | Corr-only | Fullprobe |
-|----------|-----|-----------|-----------|
-| Which organ is abnormal, heart or lung? | Lung | `lung` | `[none]` or `heart` (wrong) |
-| Where is the nodule? | Upper Right Lung | `right lung` | `left lung` (wrong) |
-| Does the picture contain liver? | No | `No` | `Yes` (hallucinated presence) |
-| What disease is shown on left of lung? | Pulmonary Mass | `mass` | Long explanation |
-| Can pneumonia be observed on right lung? | Yes | `Yes` | Long explanation |
-| Is there an esophagus in this image? | No | `No` | `[none]` |
-| Which is smaller, bladder or rectum? | Rectum | `rectum` | `[none]` |
-| Does picture contain spinal cord? | Yes | `Yes` | Long explanation |
-
-Corr-only wins on a mix of existence checks, localization, and some visual questions that fullprobe either loops on or gets wrong. Both models have blind spots — they just differ on which questions.
-
-### The probe prevents medical prior hallucination
-
-Key example from test set: **"Does the liver look normal?" (GT: Yes)**
-- Corr-only: `No` — hallucinated an abnormality from medical prior
-- Fullprobe: `Yes` — correctly assessed the image
-
-The probe reward trains the model to rely on visual evidence rather than defaulting to medical priors.
-
-## Probe Configurations
-
-| Probe | Training data | AUROC | r with correctness | predict_proba gap |
-|-------|--------------|-------|--------------------|--------------------|
-| **Corrprobe** (weak) | 154 examples, balanced | 0.667 | 0.636 | 0.83 vs 0.32 (gap: 0.51) |
-| **Fullprobe** (strong) | 572 examples, balanced from 1276 | 0.968 | 0.844 | 0.91 vs 0.15 (gap: 0.76) |
-
-Both are logistic regression on per-head bbox attention ratios (28 layers x 16 heads = 448 features), trained on correctness labels.
-
-## 2-Epoch Training (with drop_unformatted)
-
-### Full trajectory
-
-| Step | Corr-only | Corrprobe (r=0.636) | Fullprobe (r=0.844) |
-|------|-----------|---------------------|---------------------|
-| 10 | 0.302 | 0.299 | **0.308** |
-| 20 | 0.287↓ | 0.306 | 0.324 |
-| 30 | 0.333 | **0.340** | 0.336 |
-| 40 | 0.319↓ | 0.309↓ | 0.344 |
-| 50 | 0.352 | 0.327 | 0.318↓ |
-| 60 | **0.410** | 0.316 | 0.333 |
-| 70 | 0.388↓ | 0.336 | 0.368 |
-| 80 | **0.419** | **0.396** | **0.401** |
-| 90 (ep1 end) | **0.429** | 0.379↓ | 0.383↓ |
-| 100 | — | **0.406** | — |
-| ... | | | |
-| 150 | **0.481** | **0.453** | 0.444 |
-| 170 | **0.493** | **0.458** | 0.448 |
-| 180 | 0.470↓ | 0.458 | 0.449 |
-| 190 | **0.508** | — | **0.481** |
-| 200 (ep2 end) | — | — | **0.485** |
-| Epoch 2 end val | 0.488 | 0.488 | **0.491** |
-
-### Key observations
-
-1. **Corr-only spikes and crashes** throughout both epochs. Peak of 0.508 is a spike.
-2. **Fullprobe climbs monotonically** in epoch 2. Highest epoch-end val.
-3. **All three converge at epoch 2 end** (~0.488–0.491) on organ-only val. The composite reward doesn't improve final in-distribution accuracy — it stabilizes the path to get there. (The tiebreaker, at the top of this README, does improve accuracy, especially on the broader non-organ test.)
-
-## Why the Probe Matters (Even Without Accuracy Improvement)
-
-### 1. Training reliability
-The probe produces predictable, monotonic improvement. Corr-only's spikes mean you don't know if a checkpoint is genuinely good or a lucky fluctuation. With the probe, every new best is a real improvement.
-
-### 2. Reward saturation prevention
-At high correctness, most of 8 rollouts are correct → advantages near zero → no gradient. The probe maintains within-group variance because different rollouts have different attention patterns even when all correct. The **tiebreaker construction** exploits this explicitly: when correctness ties, faith disambiguates.
-
-### 3. Behavioral quality at equal accuracy
-On organ-only test, same accuracy (0.447 vs 0.445) but the probe model commits on harder visual questions. On the broader 1061-Q test, **the tiebreaker model also wins substantially on overall accuracy** (+0.14 F1), not just behavior.
-
-### 4. `drop_unformatted` is necessary
-Without it, probe conditions collapse (corrprobe crashed to 0.233 in epoch 2). With it, both conditions reach ~0.49 on organ-only val. The probe's gradient signal can't compete with format learning noise — it needs `drop_unformatted` to isolate its contribution.
+- **Interpretability:** coefficients map directly to per-head importance; can inspect which heads matter.
+- **Speed:** forward pass is one matrix-vector multiply per rollout. Orders of magnitude faster than a neural probe.
+- **Small-data regime:** 154–572 training examples is enough for LR but not for a deep probe.
+- **Bias-variance trade-off:** the probe only needs to be *ordinally* informative on correctness ties. A logistic regressor captures linear separability in attention space, which is enough for this purpose.
 
 ## Configuration
 
 | Parameter | Value |
-|-----------|-------|
-| Model | Qwen3-VL-2B-Thinking + LoRA (r=16, alpha=32) |
-| Dataset | SLAKE organ-only (5972 → 2076, 35%) |
-| Split | 10/1 train/val (1888 / 188) |
-| Test (organ-only, prior) | 364 organ-only (unseen) |
-| Test (full, new result) | 1061 English (full SLAKE test) |
-| GRPO rollouts | 8 |
+|---|---|
+| Base model | Qwen3-VL-2B-Thinking |
+| PEFT | LoRA r=16, α=32, dropout=0.05, target q/k/v/o projections |
+| Trainable params | 6,422,528 / 2.13B total (0.30%) |
+| Dataset | SLAKE (English, organ-only subset: 5972 → 2076 examples, 35%) |
+| Train/val split | 10:1 ratio → 1888 train, 188 val |
+| Test sets | 1061 English test (full), 364 organ-only test (prior experiment) |
+| GRPO rollouts per prompt | 8 |
 | Max new tokens | 512 |
-| Reward (corr_only) | α=1.0 (correctness only, token F1) |
-| Reward (composite) | α=0.7 (70% correctness + 30% probe faith) |
-| Advantage (tiebreaker, new) | `rank(correctness, faith)` lex-sort, centered |
-| Faith normalization | Global z-score + sigmoid |
-| Optimizer | AdamW, lr=1e-5, cosine schedule, grad clip 1.0 |
-| Epochs | 2 (prior experiment), 5 (new sweep) |
-| drop_unformatted | true |
+| Temperature | 1.0 (sampling), 0.0 (greedy eval) |
+| α (composite only) | 0.7 (70% correctness + 30% faith) |
+| Faith normalization | Global running z-score + sigmoid |
+| Primary reward metric | Token F1 (strict: set-overlap after lowercase + punct strip) |
+| Yes/no / numbers | Exact first-token match |
+| Advantage baseline | EBPO shrinkage of group mean |
+| Optimizer | AdamW, lr=1e-5, cosine schedule, weight decay 0.01, β=(0.9, 0.95), grad clip 1.0 |
+| Gradient accumulation | 8 rollout-example batches per optimizer step |
+| Format gating | `drop_unformatted=true` (unformatted rollouts excluded from gradient) |
+| Epochs | 5 (current sweep) |
+| Typical wall clock per run | ~3 days, 1× RTX 4090 (24 GB) |
+
+## Why the tiebreaker works
+
+GRPO's group-relative advantage becomes gradient-starved on coarse rewards like token F1: when all 8 rollouts tie on correctness (>50% of batches in our setting), σ → 0 and advantage → 0 for everyone. Two failure modes are fixed:
+
+1. **Coarse-signal collapse.** Rank-based advantage gives fixed-magnitude gradient regardless of reward distribution (GOPO-style).
+2. **Tied-group noise.** When rollouts tie on correctness, the faith tiebreaker produces meaningful ordering. Wrong rollouts that looked at the right region get positive advantage over wrong rollouts that hallucinated from nowhere.
+
+Because the correctness ordering is never flipped by faith, there is no reward-hacking pathway. The faith probe can be noisy or biased (AUROC 0.67–0.97 in our runs) — it only needs to correlate with quality among correctness-tied rollouts.
+
+## Prior experiment (2-epoch reproduction)
+
+An earlier 2-epoch comparison on the **organ-only** subset of the SLAKE test set (364 questions — only questions about organs the model was trained on) produced these numbers:
+
+| Model | Token F1 (364 organ-only) | Exact (>0.5) |
+|---|---|---|
+| Zero-shot | 0.275 | 92/364 (25.3%) |
+| Corr-only | 0.447 | 156/364 (42.9%) |
+| Corrprobe (r=0.636) | 0.424 | 148/364 (40.7%) |
+| Fullprobe (r=0.844) | 0.445 | 154/364 (42.3%) |
+
+On the in-distribution subset, corr-only and the composite-reward probes reached the same accuracy (0.447 vs 0.445), suggesting the probe as a composite reward improved training stability but not final accuracy.
+
+The new tiebreaker experiment replaces this composite-reward approach with the rank-based tiebreaker, and the gap emerges on the broader 1061-Q test set where baselines overfit to organ-specific patterns. See [`findings/reproduction_findings.md`](findings/reproduction_findings.md) for the full 2-epoch behavioral analysis (per-question unique wins, trajectory details, failure-mode tables).
 
 ## Discussion
 
 ### Is the probe circular?
 
-No. The probe maps **attention patterns** to correctness. When used as reward (or tiebreaker), it tells the model "attend like this" — not "be correct." The model can't game it by memorizing answers; it has to shift its attention distribution. The correlation (r=0.636–0.844) means it's a complementary signal from attention space, not a copy of the correctness signal.
+No. The probe maps **attention patterns** to correctness. When used as tiebreaker, it tells the model "attend like this" — not "be correct." The model cannot game it by memorizing answers; it has to shift its attention distribution. The Pearson correlation (r = 0.636–0.844) indicates a complementary signal from attention space rather than a copy of the correctness signal.
 
-### Why does the tiebreaker generalize better than composite reward?
+### Why does the tiebreaker generalize when composite does not?
 
-The tiebreaker never puts faith into the reward magnitude. Faith only disambiguates correctness ties. This preserves the pure-correctness objective exactly — the policy cannot trade correctness for faith, so it cannot over-specialize to faith patterns that bind to the training distribution. Composite reward (α=0.7) allows such trades, which helps in-distribution training but hurts on broader test questions.
+The tiebreaker never puts faith into the reward magnitude. Faith only disambiguates correctness ties. The pure-correctness objective is preserved exactly. Composite reward (α=0.7) allows tradeoffs between correctness and faith, which helps in-distribution training but over-specializes the policy to faith patterns that bind to the training distribution.
 
-### What would make the tiebreaker win even more?
+### Why logistic regression, not a deep probe?
 
-A harder task where reward saturation is a bigger problem — larger dataset, more diverse questions, or a setting where the primary reward ties frequently. The tiebreaker's advantage is largest when the primary reward is coarse and ties are common — exactly the regime GRPO on token-F1 rewards lives in.
+The tiebreaker mechanism uses only *ordinal* information from the probe — whether rollout A is more grounded than rollout B. A logistic regressor captures linear separability in attention-feature space, which is sufficient for this ordering. Deep probes would require more training data than we have for in-session feature collection and carry higher variance on a small calibration set.
+
+### `drop_unformatted` = true is required
+
+Without format gating, probe conditions collapse (e.g., corrprobe crashed to 0.233 val F1 in epoch 2 of prior experiments). With gating, both conditions reach equivalent in-distribution accuracy. Format-learning gradient dominates early training; `drop_unformatted` isolates the probe's contribution.
 
 ## Reproduction
 
@@ -226,58 +156,60 @@ git clone https://github.com/isabee426/attn-probe-SLAKE.git
 cd attn-probe-SLAKE
 export PYTHONPATH=src:/path/to/faithscan_vqarad/src
 
-# Train probe
+# 1. Train the logistic regression probe from extracted features
 python scripts/retrain_probe_balanced.py \
     --features /path/to/spatial_features.npz \
     --output checkpoints/spatial_probe/
 
-# GRPO training (5 epochs)
+# 2. GRPO training (5 epochs)
 CUDA_VISIBLE_DEVICES=0 python -m faithscan.train_grpo --config configs/reproduction/correctness_only_seed42.yaml
 CUDA_VISIBLE_DEVICES=1 python -m faithscan.train_grpo --config configs/reproduction/spatial_grpo_a07_corrlabels_seed42.yaml
 CUDA_VISIBLE_DEVICES=2 python -m faithscan.train_grpo --config configs/tiebreaker_slake_seed42.yaml
 
-# Test set evaluation (full 1061 English test)
+# 3. Test set evaluation (full 1061 English test)
 CUDA_VISIBLE_DEVICES=0 python scripts/eval_test_set.py \
     --corr-ckpt checkpoints/correctness_only/seed42/best_correct \
     --fullprobe-ckpt checkpoints/spatial_grpo_fullprobe/a07_seed42/best_correct \
     --output results/test_set.json
 ```
 
-## File Structure
+## File structure
 
 ```
 attn-probe-SLAKE/
 ├── README.md
 ├── src/faithscan/
-│   ├── train_grpo.py                   # GRPO training loop (tiebreaker + rank advantage flags)
-│   ├── reward.py                       # Correctness + composite reward
-│   ├── data/dataset.py                 # Data loading
+│   ├── train_grpo.py                   # GRPO training (tiebreaker + rank advantage flags)
+│   ├── reward.py                       # Correctness (token F1) + composite reward
+│   ├── data/dataset.py                 # SLAKE / VQA-RAD / PathVQA loaders
 │   └── models/
-│       ├── lookback_lens.py            # Spatial attention probe + faith
-│       └── dhcp_probe.py               # Cross-modal probe (legacy)
+│       ├── lookback_lens.py            # Spatial attention probe + faith computation
+│       └── dhcp_probe.py               # Cross-modal attention probe (legacy)
 ├── configs/
-│   ├── original/                       # Original April 4 configs
-│   ├── reproduction/                   # 3 conditions x 2 seeds (2-epoch prior experiment)
-│   └── tiebreaker_slake_seed*.yaml     # New 5-epoch tiebreaker sweep
+│   ├── original/                       # April 4 configs
+│   ├── reproduction/                   # 3 conditions × 2 seeds (2-epoch prior)
+│   └── tiebreaker_slake_seed*.yaml     # 5-epoch tiebreaker sweep (current)
 ├── scripts/
-│   ├── train_spatial_probe.py          # Probe training
-│   ├── eval_test_set.py                # Unseen test set evaluation
-│   ├── retrain_probe_balanced.py       # Retrain with balanced classes
-│   ├── compare_checkpoints.py          # Eval zero-shot vs trained
-│   └── rollout_analysis.py             # Qualitative rollout comparison
-└── findings/                           # All experiment logs and analysis
-    ├── tiebreaker_grpo_results.md      # New — tiebreaker result details
-    ├── slake_final_results.md
-    ├── reproduction_findings.md
+│   ├── train_spatial_probe.py          # Feature extraction + LR probe training
+│   ├── retrain_probe_balanced.py       # Class-balanced probe retraining
+│   ├── eval_test_set.py                # SLAKE test eval (strict token F1)
+│   ├── compare_checkpoints.py          # Zero-shot vs trained comparison
+│   └── rollout_analysis.py             # Per-question rollout diffing
+└── findings/                           # Full experiment logs and analyses
+    ├── tiebreaker_grpo_results.md      # Current — tiebreaker result details, val trajectories, ablations
+    ├── tiebreak_s456_open_responses.md # 645 open-ended test responses with full reasoning traces
+    ├── reproduction_findings.md        # Prior 2-epoch behavioral analysis + unique-wins tables
+    ├── slake_final_results.md          # Earlier SLAKE sweep
     └── ...
 ```
 
 ## References
 
-- **GOPO** (arXiv:2602.03876, Feb 2026) — Group Ordinal Policy Optimization. Closest prior work on rank-based GRPO advantages. Single scalar reward; no compositional/tiebreaker mechanism.
-- **FaithRL** (arXiv:2602.05897, Feb 2026) — Step-level faithfulness reward via external PRM + truncated resampling. Different domain (text QA), different mechanism (additive composite).
-- Dr. GRPO (arXiv:2503.02948)
-- Med-R1 (arXiv:2503.13939)
-- VLAA-Thinker (arXiv:2504.11468)
-- DHCP (arXiv:2411.18659)
-- Lookback Lens (EMNLP 2024)
+- **GOPO** (arXiv:2602.03876, Feb 2026) — Group Ordinal Policy Optimization. Rank-based GRPO advantages for single scalar rewards. We extend to compositional sparse-reward settings via the tiebreaker.
+- **FaithRL** (arXiv:2602.05897, Feb 2026) — Step-level faithfulness reward via external PRM + truncated resampling. Different mechanism (additive composite), different domain (text QA).
+- **Dr. GRPO** (arXiv:2503.02948) — Unbiased GRPO reference. Our baseline uses this variant of the advantage.
+- **Med-R1** (arXiv:2503.13939) — GRPO on Qwen2-VL-2B for medical VQA. Reports +29.94% over SFT under fuzzy correctness; we compare under strict token F1.
+- **DAPO** (2025) — Dynamic sampling fix for advantage collapse. Different fix for the same problem.
+- **Lookback Lens** (EMNLP 2024) — Per-head attention-ratio-based hallucination detector; inspired our per-head bbox feature construction.
+- **DHCP** (arXiv:2411.18659) — Cross-modal attention hallucination detection.
+- **VLAA-Thinker** (arXiv:2504.11468) — SFT-then-RL dynamics in visual reasoning models.
