@@ -129,7 +129,7 @@ An earlier 2-epoch comparison on the **organ-only** subset of the SLAKE test set
 
 On the in-distribution subset, corr-only and the composite-reward probes reached the same accuracy (0.447 vs 0.445), suggesting the probe as a composite reward improved training stability but not final accuracy.
 
-The new tiebreaker experiment replaces this composite-reward approach with the rank-based tiebreaker, and the gap emerges on the broader 1061-Q test set where baselines overfit to organ-specific patterns. See [`findings/tiebreaker_grpo_results.md`](findings/tiebreaker_grpo_results.md) for the full tiebreaker results (val trajectories, matched-seed comparisons, corrrank ablation, GOPO comparison). See [`findings/reproduction_findings.md`](findings/reproduction_findings.md) for the prior 2-epoch behavioral analysis (per-question unique wins, trajectory details, failure-mode tables).
+The new tiebreaker experiment replaces this composite-reward approach with the rank-based tiebreaker, and the gap emerges on the broader 1061-Q test set where baselines overfit to organ-specific patterns. For the full tiebreaker results (val trajectories, matched-seed comparisons, corrrank ablation, GOPO comparison) see [`findings/tiebreaker_grpo_results.md`](findings/tiebreaker_grpo_results.md). For a per-question behavioral analysis of the current sweep (head-to-head tables, unique-wins examples, failure-mode categorization, generation-length statistics) see [`findings/tiebreak_behavioral_analysis.md`](findings/tiebreak_behavioral_analysis.md).
 
 ## Discussion
 
