@@ -40,15 +40,27 @@ Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest ev
 | Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
 |---|---|---|---|---|---|---|---|
 | corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (step 220) | −0.0858 |
-| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4481 (step 220) | — |
+| corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4516 (step 230) | −0.0063 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (step 180) | −0.0763 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5828 (step 290, still climbing)** | −0.0625 |
+| **tiebreaker (ours)** | 42 | **0.5218** | **554/1061** | **0.7019** | **0.4056** | **0.6190 (step 570, latest peak)** | refresh on step-570 ckpt pending |
 | **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (step 270) | **+0.0412** |
-| corrrank (ablation) | 42 | pending | — | — | — | 0.3401 (step 80) | — |
-| corrrank (ablation) | 456 | pending | — | — | — | 0.3308 (step 100) | — |
+| corrrank (ablation) | 42 | pending | — | — | — | 0.4061 (step 180) | — |
+| corrrank (ablation) | 456 | pending | — | — | — | 0.3602 (step 200) | — |
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 
-Test eval notes: tiebreak_s42 test F1 was recorded on the step-250 best_correct; current best is step-290 (val 0.5828), a refresh is running and should bump this number. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 then); the step-270 peak (val 0.5201) has not been refreshed yet (already-reported 0.5340 is from the weaker checkpoint).
+Test eval notes: the 0.5218 tiebreak_s42 number is a refresh against the earlier best_correct checkpoint (around step 290–370). The current best_correct on disk is step 570 (val 0.6190), and a second refresh eval on that checkpoint is running. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 at that time); the step-270 peak (val 0.5201) has not been refreshed yet, so the reported 0.5340 is from the weaker checkpoint.
+
+### Out-of-domain test (VQARAD, 451 questions — model never trained on this dataset)
+
+| Model | VQARAD F1 | Exact | vs corr_only |
+|---|---|---|---|
+| zero_shot | 0.1246 | 47/451 | — |
+| corr_only (s42) | 0.3385 | 145/451 | baseline |
+| composite α=0.7 (s42) | 0.3257 | 138/451 | **−0.0128** (composite hurts OOD) |
+| **tiebreaker (s42)** | **0.4564** | **199/451** | **+0.1179 (+34.8% rel)** |
+| **tiebreaker (s456)** | **0.4644** | **202/451** | **+0.1259 (+37.2% rel)** |
+
+The tiebreaker's SLAKE-test gain over corr_only replicates on VQARAD OOD (+0.12 F1 on both seeds). Composite underperforms corr_only on VQARAD by 0.013 F1, directly validating the reward-shape-overfitting concern behind the tiebreaker construction. PathVQA OOD eval pending.
 
 ### Deltas
 

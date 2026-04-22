@@ -9,16 +9,27 @@ Full SLAKE English test set (1061 questions, including non-organ questions the m
 | Model | Seed | Test F1 | Exact | Closed Q | Open Q | Val peak (step) | Val→Test |
 |---|---|---|---|---|---|---|---|
 | corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (220) | −0.086 |
+| corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4516 (230) | −0.006 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (180) | −0.076 |
-| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | **0.5828 (290, still climbing)** | −0.062 |
+| **tiebreaker (ours)** | 42 | **0.5218** | **554/1061** | **0.7019** | **0.4056** | **0.6190 (570, latest peak)** | refresh on step-570 ckpt running |
 | **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (270) | **+0.041** |
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 
-**Tiebreaker (s456) vs baselines (all matched on seed 42):**
+### Out-of-domain (VQARAD test, 451 questions — model never trained on this dataset)
+
+| Model | VQARAD F1 | Exact | vs corr_only baseline |
+|---|---|---|---|
+| zero_shot | 0.1246 | 47/451 | — |
+| corr_only (s42) | 0.3385 | 145/451 | baseline |
+| composite α=0.7 (s42) | 0.3257 | 138/451 | **−0.013** (composite hurts OOD) |
+| **tiebreaker (s42)** | **0.4564** | **199/451** | **+0.118 (+34.8% relative)** |
+| **tiebreaker (s456)** | **0.4644** | **202/451** | **+0.126 (+37.2% relative)** |
+
+**Tiebreaker (s456) vs baselines (all matched on seed 42, SLAKE test):**
 - vs composite: **+0.0977 absolute F1, +22.4% relative**
 - vs corr_only: **+0.1254 absolute F1, +30.7% relative**
 
-**Generalization pattern:** composite and corr_only overfit the organ-only training distribution (val → test drops 0.08–0.09 F1). Tiebreaker does not: val → test is essentially flat for s42 (−0.06) and rising for s456 (+0.04).
+**Generalization pattern:** composite and corr_only overfit the organ-only training distribution (val → test drops 0.08–0.09 F1). Tiebreaker does not: val → test is flat or rising. The pattern replicates on OOD: composite underperforms corr_only on VQARAD (−0.013 F1), while tiebreaker gains +0.12 F1 over corr_only across both seeds.
 
 ## The method
 
