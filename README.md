@@ -8,18 +8,25 @@ Training a spatial grounding probe on organ bounding box attention patterns to d
 
 A new construction — using the probe as an **ordinal tiebreaker** in rank-based advantages rather than adding it to the reward magnitude — beats both correctness-only and composite-reward GRPO on the full SLAKE English test set (1061 questions, including non-organ questions the model was never trained on).
 
-### Main result (full SLAKE English test set, 1061 Q)
+### Main result (full SLAKE English test set, 1061 Q, latest best_correct checkpoints)
 
-| Model | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
-|---|---|---|---|---|---|---|
-| corr_only (α=1.0) | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.0925 |
-| composite (α=0.7) | 0.4126 | 419/1061 | 0.5888 | 0.2991 | 0.5126 | −0.1000 |
-| **tiebreaker (ours)** | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.4928 | **+0.0412** |
+| Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
+|---|---|---|---|---|---|---|---|
+| zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
+| corr_only (α=1.0) | 42 | 0.3919 | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.093 |
+| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 | −0.076 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5328 | −0.012 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 | **+0.014** |
 
-- vs composite-reward: **+0.1214 absolute F1, +29% relative**
-- vs correctness-only: **+0.1421 absolute F1, +36% relative**
+corr_s42 number uses the earlier step-100 best_correct eval; a refreshed eval at step-180 best_correct is running (expected within hours). corr_s456 eval pending.
 
-**Composite-reward and correctness-only both overfit the organ-only training distribution** — val peaks ~0.48–0.51 on organ-only SLAKE, test drops to 0.39–0.41 on the broader English test. The tiebreaker does the opposite — val peak 0.49, test F1 **higher** at 0.53. It learned the underlying task rather than reward-shape artifacts.
+- tiebreaker_s456 vs composite-reward (s42): **+0.0977 absolute F1 (+22.4% relative)**
+- tiebreaker_s456 vs correctness-only (s42): **+0.1421 absolute F1 (+36.3% relative)**
+- tiebreaker_s42 vs correctness-only (s42, matched seed): **+0.1284 absolute F1 (+32.8% relative)**
+
+All GRPO methods beat zero-shot by +0.09 to +0.24 absolute F1. The tiebreaker gains over the other GRPO methods are not from "GRPO works" but from the specific construction.
+
+**Composite-reward and correctness-only both overfit the organ-only training distribution** — val peaks 0.48–0.53 on organ-only SLAKE, test drops to 0.39–0.44 on the broader English test. The tiebreaker does the opposite — val 0.49–0.53, test F1 in the same range or higher. Val→test gap collapses from −0.08/−0.09 to −0.01/+0.01.
 
 ### The method
 

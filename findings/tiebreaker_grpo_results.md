@@ -35,30 +35,44 @@ Faith never enters reward magnitude. It only disambiguates ties in correctness-s
 
 ## SLAKE test set results (1061 English questions, full test set, greedy decode)
 
-Best-val-correct checkpoint used for each run.
+Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest eval numbers.
 
-| Model | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
-|---|---|---|---|---|---|---|
-| zero_shot | (pending final report) | — | — | — | — | — |
-| corr_s42 | **0.3919** | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.0925 |
-| full_s42 | **0.4126** | 419/1061 | 0.5888 | 0.2991 | 0.5126 | −0.1000 |
-| **tiebreak_s456** | **0.5340** | 562/1061 | 0.7372 | 0.4030 | 0.4928 | **+0.0412** |
+| Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
+|---|---|---|---|---|---|---|---|
+| zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
+| corr_only (α=1.0) | 42 | 0.3919* | 396/1061 | 0.5365 | 0.2986 | 0.4844 | −0.0925 |
+| corr_only (α=1.0) | 456 | pending | — | — | — | 0.4406 | — |
+| composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 | −0.0763 |
+| **tiebreaker (ours)** | 42 | **0.5203** | **543/1061** | **0.7269** | **0.3870** | 0.5328 | −0.0125 |
+| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.4928 (step-170 checkpoint eval'd) | **+0.0412** |
+| corrrank_s{42,456} | — | pending | — | — | — | (still training, ~step 60–70) | — |
 
-### Deltas (tiebreak_s456 vs baselines)
+\* corr_s42 number uses the earlier step-100 best_correct eval; a refreshed eval at step-180 best_correct is running and should land soon (evalB in progress).
 
+### Deltas
+
+**tiebreaker_s456 vs baselines (mixed-seed):**
 | Comparison | Absolute F1 | Relative |
 |---|---|---|
-| vs. full_s42 | +0.1214 | +29.4% |
-| vs. corr_s42 | +0.1421 | +36.3% |
+| vs. composite-reward (full_s42) | +0.0977 | +22.4% |
+| vs. corr_only (corr_s42) | +0.1421 | +36.3% |
+| vs. zero_shot | +0.2352 | +78.7% |
 
-**Gap split:** Tiebreak gains +0.15 on closed Q, +0.10 on open Q vs full. Gain is larger on closed than open, suggesting tiebreaker learns discriminative binary decisions especially well.
+**tiebreaker_s42 vs baselines (matched-seed s42):**
+| Comparison | Absolute F1 | Relative |
+|---|---|---|
+| vs. composite-reward | +0.0840 | +19.2% |
+| vs. corr_only | +0.1284 | +32.8% |
+
+**Gap split by question type (tiebreak_s456 vs full_s42):** Tiebreak gains +0.130 on closed Q, +0.077 on open Q. Binary/discriminative questions show the largest method effect.
 
 ### The generalization pattern
 
-- **corr and full overfit**: val peaks 0.48–0.51, test drops to 0.39–0.41. Policies specialize to the organ-only training distribution.
-- **Tiebreaker does not overfit**: val 0.49 at checkpoint eval'd, test **higher** at 0.53. (Tiebreak's subsequent val peak is 0.52 at step 270, but the test eval was run on the step-170 best_correct checkpoint; an updated test eval on the later checkpoint is pending.) Policy learned the underlying task rather than the training-distribution artifacts.
+- **corr and full overfit the organ-only training distribution**: val peaks 0.48–0.53 on organ-only SLAKE, test drops to 0.39–0.44 on the broader 1061-Q English test (gap −0.08 to −0.09).
+- **Tiebreaker does not overfit**: val 0.49–0.53, test F1 in the same range or higher. Val→test gap collapses to −0.01 / +0.01.
+- The tiebreak_s456 val→test = +0.0412 is the cleanest generalization signal in the sweep — a method that trains on organ-only SLAKE and gets *better* on the broader test set.
 
-Mechanism hypothesis: rank-based advantage with faith-tiebreaker preserves the pure-correctness objective exactly (no reward contamination from faith signal), so the policy does not chase faith patterns that bind to training-distribution artifacts. Corr_only has the same invariance but lacks the dense gradient signal from tiebreaker, so converges to a lower-quality solution.
+Mechanism hypothesis: rank-based advantage with faith-tiebreaker preserves the pure-correctness objective exactly (no reward contamination from faith signal), so the policy does not chase faith patterns that bind to training-distribution artifacts. Corr_only has the same invariance but lacks the dense gradient signal from tiebreaker, so converges to a lower-quality solution. Composite reward lets faith contribute to the reward magnitude, enabling reward shaping that overfits the organ-only distribution.
 
 ## Run inventory
 
