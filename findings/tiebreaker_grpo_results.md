@@ -312,3 +312,76 @@ Our construction — compositional lex-rank advantage with ordinal auxiliary tie
 - Logs: `/data3/ishaplan/cse40_slake_repro/slake_reproduction/results/{corr,full,tiebreak,corrrank}_*.log`
 - Checkpoints: `/data3/ishaplan/slake_reproduction/checkpoints_5ep/{correctness_only,spatial_grpo_fullprobe,tiebreaker,correctness_rank}/seed{42,456}/`
 - SLAKE test eval: `/data3/ishaplan/cse40_slake_repro/slake_reproduction/results/slake_test_4way.json`
+
+## Training evolution: how tiebreak_s42 responses changed from early to late
+
+Two test evals were run on tiebreak_s42: one against an earlier best_correct checkpoint (~step 290, val 0.5828) and one against the later best_correct (step 570, val 0.6190). Comparing per-question outputs reveals a major shift in reasoning style.
+
+**Mean generation length: 554 chars (early) → 335 chars (late). That is a 40% compression.**
+
+### Reasoning style shift: from analysis to description
+
+Early checkpoint reasoning traces included:
+- Medical-fact lookups ("T1-weighted images show gray matter as lighter...")
+- Multi-step deliberation ("wait, let me check...")
+- Reference to anatomy ("pneumothorax is air in the pleural space...")
+- Domain-specific explanations
+
+Late checkpoint reasoning traces collapsed to:
+- Image-description only ("The image is a black and white X-ray with a clear view of the chest, including the ribs...")
+- No medical reasoning chain
+- Direct jump to an answer after descriptive sentence
+
+**Example: same question, two checkpoints:**
+
+> *Is the lung abnormal? Gold: Yes*
+>
+> **Early (~step 290, 817 chars, correct):** "...check for abnormalities. First, check the lung fields. The left lung (marked L) and right lung. Are there any signs of consolidation, nodules, or other issues? The image shows the lungs with some areas that might be darker or have irregularities. Wait, in chest X-rays, normal lungs have clear lung fields. If there's a mass or abnormality, it would show up..." → `Yes` ✓
+>
+> **Late (step 570, 257 chars, correct):** "The image is a black and white X-ray with a view of the chest, showing the rib cage, lungs, heart, and part of the shoulder with a PORTABLE label and an L for left side with an arrow." → `Yes` ✓
+
+Both correct, but the reasoning changed entirely. Late checkpoint no longer analyzes pathology; it describes the image surface and jumps to an answer.
+
+### Why this helps on open-ended questions
+
+The late-checkpoint style produces cleaner, more precise single-word answers because it commits to the answer without getting caught in verbose qualifications.
+
+> *What is the largest organ in the picture? Gold: Lung*
+>
+> **Early:** Verbose "the liver is the big structure in the center... yes, the liver is the largest" → `liver` ✗
+>
+> **Late:** Brief image description with no organ analysis → `lung` ✓
+
+The early checkpoint *reasoned itself into the wrong answer* by committing too early in the analysis. The late checkpoint just describes what it sees and answers correctly. Similar pattern on color, plural, and terminology questions.
+
+### Why this regresses some closed-ended questions
+
+The late-checkpoint style can produce confident yes/no flips because it never reasons about the actual pathological content.
+
+> *Is the lung healthy? Gold: No*
+>
+> **Early (correct):** "there's a noticeable area that's more opaque, which could be a sign of pathology like pneumonia... the lung isn't healthy." → `No` ✓
+>
+> **Late (wrong):** Image description only, no pathology analysis → `Yes` ✗
+
+Without reasoning, the late checkpoint defaults to "yes it contains it" / "yes it looks normal" on ambiguous images. This is reward-hacking-adjacent: the policy learned that shorter responses get higher advantage, but some hard binary questions require the reasoning to arrive at the correct answer.
+
+### Counting the tradeoff across the test set
+
+At the per-question level between the two checkpoints (out of 1061):
+- **136 questions newly won** by the late checkpoint (step-570 right, earlier checkpoint wrong)
+- **111 questions newly lost** by the late checkpoint
+- Net +25 questions
+- By type: CLOSED net **−26** (regression), OPEN net **+51** (improvement)
+
+Net F1 is higher because open-ended questions are the majority (645 of 1061) and the improvement on open-ended outweighs the closed-ended regression.
+
+### What this suggests for future work
+
+The late-checkpoint behavior — dropping the medical reasoning chain entirely — is a form of reward-hacking-adjacent convergence. The tiebreaker's denser gradient drives tersening, but past a certain point this costs reasoning capability on hard closed-ended questions.
+
+Two possible mitigations, either for ablation in the paper or future work:
+1. **Early stopping on closed-Q F1 variance** — stop training when closed-Q F1 starts regressing relative to open-Q F1
+2. **Reasoning-length regularizer** — add a small auxiliary signal rewarding reasoning chains of a minimum length, integrated either as a second-level tiebreaker or in a composite reward
+
+This is consistent with the auxiliary-saturation boundary already noted: when faith saturates, the tiebreaker degrades and training continues to tersen the policy past the point of diminishing returns.
