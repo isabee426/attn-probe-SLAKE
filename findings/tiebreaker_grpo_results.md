@@ -70,7 +70,7 @@ Full test set (6719 questions):
 | Model | PathVQA F1 | Exact | vs corr_only |
 |---|---|---|---|
 | **tiebreaker (s42)** | **0.3212** | **2110/6719** | _corr_only full-6719 queued_ |
-| tiebreaker (s456) | _running_ | — | — |
+| **tiebreaker (s456)** | **0.3375** | **2194/6719** | _corr_only full-6719 queued_ |
 | corr_only (s42) | _running_ | — | baseline |
 | corrrank (s42) | _running_ | — | — |
 | corrrank (s456) | _running_ | — | — |
@@ -365,7 +365,7 @@ Our construction — compositional lex-rank advantage with ordinal auxiliary tie
 - Two seeds with completed SLAKE-test eval on the main method (tiebreak_s42, tiebreak_s456). VQARAD OOD also two seeds.
 - Corrrank ablation now has test-set numbers (0.3807 / 0.4141) — the rank-alone-fails-on-sparse-rewards story is directly supported by matched-seed comparisons.
 - Full fine-tune not tested (LoRA only). Reviewer concern: may the effect be LoRA-specific.
-- PathVQA OOD: only tiebreak_s42 so far (F1 0.3212 on full 6719). corr_only and corrrank OOD evals queued overnight 2026-04-22.
+- PathVQA OOD: tiebreak_s42 (F1 0.3212) and tiebreak_s456 (F1 0.3375) on full 6719. corr_only and corrrank OOD evals queued; corr_s42 pathvqa eval 59% through as of 2026-04-23.
 - Bbox-free tiebreaker (Option D) passes all probe-level diagnostics but has not yet produced GRPO F1 numbers — training still in progress.
 
 ## Next steps
