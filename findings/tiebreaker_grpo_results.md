@@ -1,6 +1,6 @@
 # Rank-Based Tiebreaker GRPO: Live Results
 
-**Date:** April 21, 2026
+**Date:** April 21, 2026 (last major update); table refresh 2026-04-23
 **Dataset:** SLAKE organ-only (5972 → 2076, 35%), 10/1 split (1888 train / 188 val), SLAKE English test set (1061 Q)
 **Model:** Qwen3-VL-2B-Thinking + LoRA (r=16), 8 rollouts, max_new_tokens=512
 **Metric:** Token F1 (strict — extract `<answer>` or post-`</think>`, token-overlap F1; yes/no and numbers use exact match)
@@ -35,17 +35,18 @@ Faith never enters reward magnitude. It only disambiguates ties in correctness-s
 
 ## SLAKE test set results (1061 English questions, full test set, greedy decode)
 
-Best-val-correct checkpoint used for each run. Updated 2026-04-21 with latest eval numbers.
+Best-val-correct checkpoint used for each run. Updated 2026-04-23 with latest eval numbers (corrrank seeds 42/456 + refreshed corr_only s42).
 
 | Model | Seed | Overall F1 | Exact | Closed Q F1 | Open Q F1 | Val peak | Val→Test gap |
 |---|---|---|---|---|---|---|---|
-| corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (step 220) | −0.0858 |
-| corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4516 (step 230) | −0.0063 |
+| corr_only (α=1.0) | 42 | **0.4299** | **440/1061** | **0.5830** | **0.3312** | **0.5166 (step 290)** | −0.0867 |
+| corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4790 (step 250) | −0.0337 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (step 180) | −0.0763 |
-| **tiebreaker (ours)** | 42 | **0.5472** | **579/1061** | **0.6635** | **0.4722** | **0.6190 (step 570, sweep peak)** | −0.0718 |
-| **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (step 270) | **+0.0412** |
-| corrrank (ablation) | 42 | pending | — | — | — | 0.4061 (step 180) | — |
-| corrrank (ablation) | 456 | pending | — | — | — | 0.3602 (step 200) | — |
+| **tiebreaker (ours, bbox-cond)** | 42 | **0.5472** | **579/1061** | **0.6635** | **0.4722** | **0.6190 (step 570, sweep peak)** | −0.0718 |
+| **tiebreaker (ours, bbox-cond)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (step 270) | **+0.0412** |
+| corrrank (ablation) | 42 | **0.3807** | **382/1061** | **0.5206** | **0.2904** | 0.4577 (step 250) | −0.0770 |
+| corrrank (ablation) | 456 | **0.4141** | **421/1061** | **0.5743** | **0.3108** | 0.4248 (step 290) | −0.0107 |
+| **tiebreaker (ours, bbox-free, Option D)** | 42 | _training_ | | | | step 20 so far: 0.3109 | _early_ |
 | zero_shot | — | 0.2988 | 290/1061 | 0.3934 | 0.2378 | — | — |
 
 Test eval notes: the 0.5472 tiebreak_s42 number is from a refresh eval against the step-570 best_correct checkpoint (val 0.6190). An earlier eval against an intermediate (~step-290) checkpoint produced 0.5218 with a different closed/open profile: closed-Q F1 was higher (0.7019 vs 0.6635) while open-Q F1 was lower (0.4056 vs 0.4722). The later checkpoint trades some yes/no precision for substantially better open-ended reasoning. Tiebreak_s456 test eval used the step-170 checkpoint (val 0.4928 at that time); the step-270 peak (val 0.5201) has not been refreshed yet, so the reported 0.5340 is from the weaker checkpoint.
@@ -60,7 +61,27 @@ Test eval notes: the 0.5472 tiebreak_s42 number is from a refresh eval against t
 | **tiebreaker (s42)** | **0.4564** | **199/451** | **+0.1179 (+34.8% rel)** |
 | **tiebreaker (s456)** | **0.4644** | **202/451** | **+0.1259 (+37.2% rel)** |
 
-The tiebreaker's SLAKE-test gain over corr_only replicates on VQARAD OOD (+0.12 F1 on both seeds). Composite underperforms corr_only on VQARAD by 0.013 F1, directly validating the reward-shape-overfitting concern behind the tiebreaker construction. PathVQA OOD eval pending.
+The tiebreaker's SLAKE-test gain over corr_only replicates on VQARAD OOD (+0.12 F1 on both seeds). Composite underperforms corr_only on VQARAD by 0.013 F1, directly validating the reward-shape-overfitting concern behind the tiebreaker construction.
+
+### Out-of-domain test (PathVQA)
+
+Full test set (6719 questions):
+
+| Model | PathVQA F1 | Exact | vs corr_only |
+|---|---|---|---|
+| **tiebreaker (s42)** | **0.3212** | **2110/6719** | _corr_only full-6719 queued_ |
+| tiebreaker (s456) | _running_ | — | — |
+| corr_only (s42) | _running_ | — | baseline |
+| corrrank (s42) | _running_ | — | — |
+| corrrank (s456) | _running_ | — | — |
+
+Earlier 500-example subset (older ckpts, not directly comparable to above):
+
+| Model | PathVQA-500 F1 | Exact |
+|---|---|---|
+| zero_shot | 0.0627 | 25/500 |
+| corr_only | 0.1385 | 64/500 |
+| bbox spatial probe (weighted) | 0.1166 | 53/500 |
 
 ### Deltas
 
@@ -68,14 +89,18 @@ The tiebreaker's SLAKE-test gain over corr_only replicates on VQARAD OOD (+0.12 
 | Comparison | Absolute F1 | Relative |
 |---|---|---|
 | vs. composite-reward (full_s42) | +0.0977 | +22.4% |
-| vs. corr_only (corr_s42) | +0.1254 | +30.7% |
+| vs. corr_only (corr_s42, 5ep best_correct) | +0.1041 | +24.2% |
+| vs. corrrank_s456 (matched-seed ablation) | +0.1199 | +28.9% |
 | vs. zero_shot | +0.2352 | +78.7% |
 
-**tiebreaker_s42 vs baselines (matched-seed s42, updated with step-570 eval):**
+**tiebreaker_s42 vs baselines (matched-seed s42, step-570 eval):**
 | Comparison | Absolute F1 | Relative |
 |---|---|---|
 | vs. composite-reward | +0.1109 | +25.4% |
-| vs. corr_only | +0.1386 | +33.9% |
+| vs. corr_only (5ep best_correct) | +0.1173 | +27.3% |
+| vs. corrrank_s42 (matched-seed ablation) | +0.1665 | +43.7% |
+
+**Rank-only ablation lands — corrrank underperforms corr_only on both seeds** (s42: 0.3807 vs 0.4299 = −0.049; s456: 0.4141 vs 0.4453 = −0.031). This is the predicted failure mode: rank-based advantage with arbitrary tie-breaking on sparse discrete rewards injects noise. The faith-tiebreaker construction rescues this — tiebreak_s42 beats corrrank_s42 by +0.167 F1 on the same seed.
 
 **Gap split by question type (tiebreak_s456 vs full_s42):** Tiebreak gains +0.130 on closed Q, +0.077 on open Q. Binary/discriminative questions show the largest method effect.
 
@@ -189,15 +214,17 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 - full_s42: 0.4757
 - tiebreak_s42: **0.5148** — **Δ +0.071 over corr, +0.039 over full**
 
-### Cross-method peak val correctness
+### Cross-method peak val correctness (refreshed 2026-04-23)
 
-1. **tiebreak_s42: 0.6190** (step 570, past peak; run killed step 670)
-2. tiebreak_s456: 0.5201 (step 270, past peak; run killed step 460)
+1. **tiebreak_s42 (bbox-cond): 0.6190** (step 570, past peak; run killed step 670)
+2. tiebreak_s456 (bbox-cond): 0.5201 (step 270, past peak; run killed step 460)
 3. **corr_s42: 0.5166** (step 290; run killed step 330 past peak)
 4. full_s42: 0.5126 (step 180, killed step 300)
-5. **corr_s456: 0.4790** (step 250; run killed step 340 past peak)
-6. **corrrank_s42: 0.4577** (step 250, still climbing)
-7. **corrrank_s456: 0.4166** (step 260, still climbing)
+5. tiebreak_s42_nodrop (bbox-cond, no drop_unformatted): **0.5092** (step 120, still climbing)
+6. **corr_s456: 0.4790** (step 250; run killed step 340 past peak)
+7. corrrank_s42: 0.4577 (step 250, at peak as of step 286 — val plateauing)
+8. corrrank_s456: 0.4248 (step 290, still climbing slowly)
+9. tiebreak_s42 (bbox-free, Option D): 0.3109 (step 20, too early to judge — first eval of new probe)
 
 ## Convergence assessment (2026-04-21)
 
@@ -288,6 +315,42 @@ We are not competing with GOPO — we are **extending it to sparse-reward settin
 
 > *"GOPO (Liu et al., 2026) proposes rank-based advantages as a de-noising mechanism when reward scores are continuous and approximately ordered. In sparse-reward settings where rollouts frequently tie, stable-sort-on-ties assigns arbitrary ranks that inject noise into the policy gradient (our corrrank ablation: 0.34 vs 0.42 for Dr. GRPO at matched step). Our tiebreaker construction extends GOPO to this regime by using an auxiliary signal to provide meaningful ordering over tied rollouts."*
 
+## Bbox-free probe variant (Option D — Lookback-Lens image-vs-text ratio)
+
+A version of the tiebreaker probe that requires no anatomical bounding-box annotations. Feature per head is `sum(attn → vision_tokens) / sum(attn → all_tokens)`, averaged over generated tokens — same dimensionality as the bbox-conditioned probe (448 = 28 layers × 16 heads on Qwen3-VL-2B-Thinking), drops into `train_grpo.py`'s existing `lookback_classifier` branch unchanged.
+
+### Probe-level comparison on the same labeled dataset (1000-example `spatial_grounding_v1_full`)
+
+Balanced LR, C-sweep {0.001, 0.01, 0.1, 1.0, 10.0}, 80/20 balanced split.
+
+| Feature | Val AUROC | Permutation AUROC | Real − perm gap | Top-10 heads % of L1 |
+|---|---|---|---|---|
+| Bbox-conditioned (`spatial_ratios`) | 0.809 | 0.555 ± 0.020 | +0.254 | 8.2% (diffuse) |
+| **Bbox-free (Option D, `lookback_feats`)** | **0.873** | 0.522 ± 0.027 | **+0.351** | 15.2% (concentrated) |
+
+Bbox-free outperforms bbox-conditioned on the same labels. Top-10 heads concentrate in layers L10–L18 (visual-text integration range), consistent with a genuine late-layer grounding signal rather than a shortcut.
+
+### Three-check validation (multi-rollout, 200 prompts × 8 T=1.0 rollouts, prompt-level splits)
+
+Check 2 (within-group std) and Check 3 (refit-on-shuffle permutation) are the checks that matter for GRPO tiebreaker deployment — AUROC can be high but still useless if same-prompt rollouts get near-constant scores (Check 2) or if the probe picks up prompt-id leakage (Check 3).
+
+| Check | **Option D (Lookback ratio)** — deployed | Option A (Attention entropy) — baseline |
+|---|---|---|
+| 1. Val AUROC (prompt-split) | train 0.972 / val **0.918** | train 1.000 / val 0.943 (overfit flag) |
+| 2. Within-group std (mean/median) | **0.061** / 0.052 — PASS (≥ 0.05) | 0.077 / **0.008** — degenerate (mean inflated by outliers) |
+| 3. Permuted AUROC | 0.531 ± 0.082 — PASS (≤ 0.55) | **0.579 ± 0.124 — FAIL** |
+| Verdict | **ALL PASS — deployed in GRPO** | NOT READY (circularity) |
+
+Option D clears all three checks. Option A's AUROC was partly circular — its permutation AUROC of 0.58 means ~0.1 AUROC comes from non-correctness artifacts. Within-prompt variance for Option A collapses to near-zero on most prompts (median 0.008 — effectively constant scores), which would make it useless as a tiebreaker regardless of its raw AUROC.
+
+### Earlier "Lookback Lens is circular" verdict — corrected
+
+Our earlier [probe architectures table in the README](../README.md) listed Lookback Lens as failing because of circularity. That verdict came from a naive test that didn't refit the classifier on shuffled labels and didn't use prompt-level splits. Under the proper three-check protocol, bbox-free Option D is clearly not circular — the real vs permuted gap is +0.4 AUROC.
+
+### GRPO deployment status
+
+Bbox-free tiebreaker is training with seed 42 on GPU 0 (tmux window `grpo-bboxfree`). Config: `slake_bboxfree_a07_seed42.yaml`, α=0.7, same SLAKE organ-only data filter as the bbox-conditioned runs. Latest val correctness at step 40: 0.2984 (climbing, ~16h training remaining). If step-200+ matches bbox-conditioned tiebreak trajectory, the paper claim "tiebreaker method generalizes to datasets without bbox annotations" lands.
+
 ## Related work
 
 - **GOPO** (Group Ordinal Policy Optimization, arXiv 2602.03876, Feb 2026): rank-based advantage in GRPO with single scalar reward. Targets continuous reward-model outputs. Fails on sparse token-F1 rewards (see corrrank ablation).
@@ -297,19 +360,21 @@ We are not competing with GOPO — we are **extending it to sparse-reward settin
 
 Our construction — compositional lex-rank advantage with ordinal auxiliary tiebreaker — sits at the intersection of these three lines of work: keeps GOPO's rank structure, addresses the advantage-collapse problem DAPO targets, uses an auxiliary signal like FaithRL but without reward-magnitude contamination.
 
-## Caveats (as of 2026-04-21)
+## Caveats (as of 2026-04-23)
 
-- n=1 seed with completed test eval (tiebreak_s456). tiebreak_s42 finishing training, test eval pending.
-- corrrank ablation not yet produced val > step 60 data. Cannot fully separate rank effect from tiebreaker effect yet.
+- Two seeds with completed SLAKE-test eval on the main method (tiebreak_s42, tiebreak_s456). VQARAD OOD also two seeds.
+- Corrrank ablation now has test-set numbers (0.3807 / 0.4141) — the rank-alone-fails-on-sparse-rewards story is directly supported by matched-seed comparisons.
 - Full fine-tune not tested (LoRA only). Reviewer concern: may the effect be LoRA-specific.
-- Only SLAKE organ-only training distribution. VQARAD/PathVQA OOD eval not yet run on tiebreaker.
+- PathVQA OOD: only tiebreak_s42 so far (F1 0.3212 on full 6719). corr_only and corrrank OOD evals queued overnight 2026-04-22.
+- Bbox-free tiebreaker (Option D) passes all probe-level diagnostics but has not yet produced GRPO F1 numbers — training still in progress.
 
 ## Next steps
 
-1. Complete tiebreak_s42 training to convergence (ETA +2 days).
-2. Run SLAKE test eval on tiebreak_s42 and corrrank_s{42,456} checkpoints.
-3. Run cross-dataset eval (VQARAD + PathVQA) on all best_correct checkpoints.
-4. Possible: 3rd seed (s123) for full sweep replication.
+1. Finish bbox-free tiebreaker GRPO training (ETA ~16h as of 2026-04-23 morning).
+2. Complete overnight OOD eval queue: corr_only + corrrank_s{42,456} on PathVQA full test (6719).
+3. Run SLAKE test eval on the corrrank latest `best_correct` — training may still improve these peaks.
+4. Full fine-tune ablation for reviewer defense.
+5. Possible 3rd seed (s123) for full sweep replication.
 
 ## Paths (remote, vlaa-01)
 
