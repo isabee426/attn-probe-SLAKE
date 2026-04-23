@@ -157,20 +157,26 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 | 190 | 0.4796 | 0.4105 | 0.4767 | 0.4705 | 0.5294 | **0.4308** | 0.3723 |
 | 200 | 0.4708 | 0.4430 | 0.4941 | 0.4795 | 0.5369 |  | 0.3602 |
 | 210 | 0.4621 | 0.4256 | 0.4617 | 0.4903 | 0.5342 |  | **0.3966** |
-| 220 | **0.4944** | 0.4481 | 0.4770 | 0.4826 | 0.5393 |  |  |
-| 230 | 0.4699 | 0.4516 | 0.4564 | 0.5023 | 0.5542 |  |  |
-| 240 | 0.4961 | 0.4570 | 0.4764 | 0.5145 | 0.5544 |  |  |
-| 250 | 0.4895 | 0.4790 | 0.4927 | 0.5064 | 0.5680 |  |  |
-| 260 | 0.4757 | 0.4635 | 0.4847 | 0.5052 | 0.5530 |  |  |
-| 270 | 0.4968 | 0.4529 | 0.5046 | **0.5201** | 0.5722 |  |  |
-| 280 | 0.4925 | 0.4650 | 0.4984 | 0.5129 | 0.5699 |  |  |
-| 290 |  | 0.4416 | 0.4845 | 0.5077 | 0.5828 |  |  |
-| 300 |  | 0.4517 | 0.4872 (full_s42 killed) | 0.5106 | 0.5601 |  |  |
+| 220 | **0.4944** | 0.4481 | 0.4770 | 0.4826 | 0.5393 | 0.4249 |  |
+| 230 | 0.4699 | 0.4516 | 0.4564 | 0.5023 | 0.5542 | 0.4141 | 0.4106 |
+| 240 | 0.4961 | 0.4570 | 0.4764 | 0.5145 | 0.5544 | 0.4436 | 0.4033 |
+| 250 | 0.4895 | **0.4790** | 0.4927 | 0.5064 | 0.5680 | **0.4577** | 0.3908 |
+| 260 | 0.4757 | 0.4635 | 0.4847 | 0.5052 | 0.5530 | 0.4450 | **0.4166** |
+| 270 | 0.4968 | 0.4529 | 0.5046 | **0.5201** | 0.5722 |  | 0.4115 |
+| 280 | 0.4925 | 0.4650 | 0.4984 | 0.5129 | 0.5699 |  | 0.4009 |
+| 290 | **0.5166** | 0.4416 | 0.4845 | 0.5077 | **0.5828** |  |  |
+| 300 | 0.4845 | 0.4517 | 0.4872 (full_s42 killed) | 0.5106 | 0.5601 |  |  |
+| 310 | 0.5055 | 0.4689 |  |  | 0.5401 |  |  |
+| 320 | 0.5036 | 0.4769 |  |  |  |  |  |
+| 330 | 0.4960 | 0.4374 |  |  |  |  |  |
+| 340 |  | 0.4705 |  |  |  |  |  |
 | ... | | | | tiebreak_s456 oscillating 0.48–0.52 through step 460 | tiebreak_s42 oscillating 0.51–0.60 through step ~500, then broke through | | |
 | 460 |  |  |  | 0.5003 (run killed) |  |  |  |
 | 510 |  |  |  |  | 0.6077 |  |  |
 | 570 |  |  |  |  | **0.6190** (sweep peak) |  |  |
-| 630 |  |  |  |  | 0.5609 (current, past peak) |  |  |
+| 630 |  |  |  |  | 0.5609 (run killed at step 670, past peak) |  |  |
+
+**New ablation run (not in table above):** `tiebreak_s42_nodrop` (no `drop_unformatted` format gating) launched Apr 22. Early trajectory matches tiebreak_with_drop: step 10 = 0.3046, step 20 = 0.3226, step 30 = 0.3313.
 
 ### Matched-seed comparisons
 
@@ -185,13 +191,13 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 
 ### Cross-method peak val correctness
 
-1. **tiebreak_s42: 0.5542** (step 230, still climbing)
-2. tiebreak_s456: 0.5201 (step 270, past peak)
-3. full_s42: 0.5126 (step 180)
-4. corr_s42: 0.4844 (step 180)
-5. corr_s456: 0.4430 (step 200)
-6. corrrank_s42: 0.3401 (step 80)
-7. corrrank_s456: 0.3109 (step 70)
+1. **tiebreak_s42: 0.6190** (step 570, past peak; run killed step 670)
+2. tiebreak_s456: 0.5201 (step 270, past peak; run killed step 460)
+3. **corr_s42: 0.5166** (step 290; run killed step 330 past peak)
+4. full_s42: 0.5126 (step 180, killed step 300)
+5. **corr_s456: 0.4790** (step 250; run killed step 340 past peak)
+6. **corrrank_s42: 0.4577** (step 250, still climbing)
+7. **corrrank_s456: 0.4166** (step 260, still climbing)
 
 ## Convergence assessment (2026-04-21)
 
