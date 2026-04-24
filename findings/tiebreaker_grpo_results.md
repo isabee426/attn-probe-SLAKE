@@ -301,11 +301,11 @@ Three reasons correctness-only GRPO underperforms:
 
 Tiebreaker addresses (2) directly: ties in correctness are broken by faith, producing non-zero advantages. Rank-based advantage also addresses (1): ranks span fixed range [−(N−1)/2, +(N−1)/2], giving consistent gradient magnitude regardless of reward distribution.
 
-`corrrank` ablation (running): rank-based advantage on correctness alone (no tiebreaker). Isolates whether rank structure alone is responsible for the gain, or whether the faith-tiebreaker specifically matters. Early data (step 50–80) shows corrrank at 0.29–0.34, well below tiebreak at matched step.
+`corrrank` ablation (completed): rank-based advantage on correctness alone (no tiebreaker). Isolates whether rank structure alone is responsible for the gain, or whether the faith-tiebreaker specifically matters. At matched early steps (50-80) corrrank sits at 0.29–0.34, well below tiebreak. Final peaks: corrrank_s42 0.5067, corrrank_s456 0.4390 — converging toward corr_only's peaks (0.5166 / 0.4790) but still below matched-seed tiebreak by +0.08–0.11 F1.
 
 ## Why GOPO doesn't win here (the rank-without-tiebreaker failure mode)
 
-GOPO (arXiv 2602.03876, Feb 2026) claims rank-based advantage beats Dr. GRPO's mean-subtracted advantage. Our `corrrank` ablation — which is essentially GOPO applied to token F1 rewards — underperforms Dr. GRPO (`corr_only`) by −0.08 at step 80 (0.3401 vs 0.4168). This isn't contradicting GOPO; it reveals where GOPO's assumptions break.
+GOPO (arXiv 2602.03876, Feb 2026) claims rank-based advantage beats Dr. GRPO's mean-subtracted advantage. Our `corrrank` ablation — essentially GOPO applied to token F1 rewards — underperforms Dr. GRPO (`corr_only`) at early steps (step 80: 0.3401 vs 0.4168) and converges to a roughly-matched final peak (0.5067 vs 0.5166). On this task it does not gain over the mean-subtracted baseline, which is the point of this section — where GOPO's assumptions break.
 
 ### GOPO's assumed regime: continuous reward model scores
 
@@ -333,7 +333,7 @@ Dr. GRPO handles ties gracefully: `σ → 0`, advantage → 0 for everyone. No g
 | Rollouts differ on reward | Standard advantage; works | Rank-based advantage; works |
 | **Rollouts tie on reward** | **Advantage = 0 (no gradient; wasted)** | **Advantage = rank of arbitrary order (noise gradient; harmful)** |
 
-In the sparse regime, "wasted" beats "harmful." That's why corrrank loses to corr_only here.
+In the sparse regime, "wasted" beats "harmful" early. Corrrank trails corr_only for most of training and only catches up at final peak; the tiebreaker provides the net gain via the +0.08–0.11 F1 ceiling above both.
 
 ### How the tiebreaker extends GOPO
 
@@ -386,7 +386,7 @@ Our earlier [probe architectures table in the README](../README.md) listed Lookb
 
 ### GRPO deployment status
 
-Bbox-free tiebreaker is training with seed 42 on GPU 0 (tmux window `grpo-bboxfree`). Config: `slake_bboxfree_a07_seed42.yaml`, α=0.7, same SLAKE organ-only data filter as the bbox-conditioned runs. Latest val correctness at step 40: 0.2984 (climbing, ~16h training remaining). If step-200+ matches bbox-conditioned tiebreak trajectory, the paper claim "tiebreaker method generalizes to datasets without bbox annotations" lands.
+Bbox-free tiebreaker GRPO is running: seed 42, 5 epochs, α=1.0 + `faith_tiebreaker=true`, `drop_unformatted=false`, same SLAKE organ-only data filter as the bbox-conditioned sweep. `lookback_classifier` points at the multirollout-trained bbox-free probe (the one that passes all three checks above). Training is ongoing; F1 numbers not yet landed.
 
 ## Related work
 
@@ -397,21 +397,20 @@ Bbox-free tiebreaker is training with seed 42 on GPU 0 (tmux window `grpo-bboxfr
 
 Our construction — compositional lex-rank advantage with ordinal auxiliary tiebreaker — sits at the intersection of these three lines of work: keeps GOPO's rank structure, addresses the advantage-collapse problem DAPO targets, uses an auxiliary signal like FaithRL but without reward-magnitude contamination.
 
-## Caveats (as of 2026-04-23)
+## Caveats
 
 - Two seeds with completed SLAKE-test eval on the main method (tiebreak_s42, tiebreak_s456). VQARAD OOD also two seeds.
-- Corrrank ablation now has test-set numbers (0.3807 / 0.4141) — the rank-alone-fails-on-sparse-rewards story is directly supported by matched-seed comparisons.
-- Full fine-tune not tested (LoRA only). Reviewer concern: may the effect be LoRA-specific.
-- PathVQA OOD: tiebreak_s42 (F1 0.3212) and tiebreak_s456 (F1 0.3375) on full 6719. corr_only and corrrank OOD evals queued; corr_s42 pathvqa eval 59% through as of 2026-04-23.
-- Bbox-free tiebreaker (Option D) passes all probe-level diagnostics but has not yet produced GRPO F1 numbers — training still in progress.
+- The corrrank test-set numbers in our SLAKE table (0.3807 s42 / 0.4141 s456) come from earlier checkpoints at val 0.4577 / 0.4248. The final best_correct checkpoints reached val 0.5067 / 0.4390; a re-eval on those would likely produce higher test F1 but has not been run.
+- Full fine-tune not tested (LoRA only).
+- PathVQA OOD: tiebreak_s42 F1 0.3212 and tiebreak_s456 F1 0.3375 on full 6719. corr_only and corrrank PathVQA evals not run.
+- Bbox-free tiebreaker (Option D) passes all probe-level diagnostics; GRPO F1 results pending.
 
 ## Next steps
 
-1. Finish bbox-free tiebreaker GRPO training (ETA ~16h as of 2026-04-23 morning).
-2. Complete overnight OOD eval queue: corr_only + corrrank_s{42,456} on PathVQA full test (6719).
-3. Run SLAKE test eval on the corrrank latest `best_correct` — training may still improve these peaks.
-4. Full fine-tune ablation for reviewer defense.
-5. Possible 3rd seed (s123) for full sweep replication.
+1. Complete the bbox-free tiebreaker GRPO and its length-floor ablation; report SLAKE test F1 for both.
+2. Re-eval corrrank checkpoints on SLAKE test using the final best_correct (val 0.5067 / 0.4390) — expected to shift the ablation numbers upward.
+3. Run corr_only + corrrank PathVQA evals at the current best_correct checkpoints if the OOD ablation comparison becomes needed.
+4. Port probe + GRPO pipeline to a general-domain VL dataset (see `three_month_plan.md`).
 
 ## Paths (remote, vlaa-01)
 

@@ -8,8 +8,8 @@ Full SLAKE English test set (1061 questions, including non-organ questions the m
 
 | Model | Seed | Test F1 | Exact | Closed Q | Open Q | Val peak (step) | Val→Test |
 |---|---|---|---|---|---|---|---|
-| corr_only (α=1.0) | 42 | 0.4086 | 417/1061 | 0.5720 | 0.3032 | 0.4944 (220) | −0.086 |
-| corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4516 (230) | −0.006 |
+| corr_only (α=1.0) | 42 | 0.4299 | 440/1061 | 0.5830 | 0.3312 | 0.5166 (290) | −0.087 |
+| corr_only (α=1.0) | 456 | 0.4453 | 452/1061 | 0.6203 | 0.3325 | 0.4790 (250) | −0.034 |
 | composite (α=0.7) | 42 | 0.4363 | 440/1061 | 0.6074 | 0.3259 | 0.5126 (180) | −0.076 |
 | **tiebreaker (ours)** | 42 | **0.5472** | **579/1061** | **0.6635** | **0.4722** | **0.6190 (570, sweep peak)** | −0.072 |
 | **tiebreaker (ours)** | 456 | **0.5340** | **562/1061** | **0.7372** | **0.4030** | 0.5201 (270) | **+0.041** |
@@ -27,11 +27,11 @@ Full SLAKE English test set (1061 questions, including non-organ questions the m
 
 **SLAKE test deltas (tiebreaker vs baselines, matched seed 42):**
 - tiebreak_s42 vs composite (s42): **+0.1109 absolute F1, +25.4% relative**
-- tiebreak_s42 vs corr_only (s42): **+0.1386 absolute F1, +33.9% relative**
+- tiebreak_s42 vs corr_only (s42): **+0.1173 absolute F1, +27.3% relative**
 
 **Mixed-seed comparisons (tiebreak_s456 vs s42 baselines):**
 - vs composite: **+0.0977 absolute F1, +22.4% relative**
-- vs corr_only: **+0.1254 absolute F1, +30.7% relative**
+- vs corr_only: **+0.1041 absolute F1, +24.2% relative**
 
 **Checkpoint selection note (tiebreak_s42):** the step-570 checkpoint (val 0.6190) has a different closed/open profile than the earlier step-290 checkpoint (val 0.5828): closed-Q F1 regressed slightly (0.7019 → 0.6635), open-Q F1 rose substantially (0.4056 → 0.4722). Net test F1 is higher (0.5472 vs 0.5218) because open-Q is the majority of the test set. The tiebreaker's deeper-training checkpoints trade some yes/no precision for better open-ended reasoning.
 
@@ -74,6 +74,8 @@ Feature dimensionality: **28 layers × 16 heads = 448 features** per rollout.
 |---|---|---|---|---|---|
 | **Corrprobe** (weak) | 154 examples, balanced positives/negatives | correctness label (0/1) | 0.667 | 0.636 | 0.83 vs 0.32 (gap 0.51) |
 | **Fullprobe** (strong) | 572 examples, balanced from 1276 candidates | correctness label (0/1) | 0.968 | 0.844 | 0.91 vs 0.15 (gap 0.76) |
+
+*AUROC above is train-set on the balanced sample. Prompt-split held-out AUROC for the bbox-conditioned probe (re-evaluated on 1000 examples) is **0.809** with permuted-label baseline **0.555**; see `findings/tiebreaker_grpo_results.md` for the three-check protocol. The high train AUROC reflects the n ≈ d small-sample regime of the fullprobe.*
 
 Both probes:
 - **Model class:** logistic regression (scikit-learn, default L2 penalty)
@@ -152,7 +154,9 @@ The new tiebreaker experiment replaces this composite-reward approach with the r
 
 ### Is the probe circular?
 
-No. The probe maps **attention patterns** to correctness. When used as tiebreaker, it tells the model "attend like this" — not "be correct." The model cannot game it by memorizing answers; it has to shift its attention distribution. The Pearson correlation (r = 0.636–0.844) indicates a complementary signal from attention space rather than a copy of the correctness signal.
+The probe is trained on correctness labels, so a correlation between probe output and correctness is expected by construction and is not itself evidence against circularity. The more informative check is the permutation test: training the probe on shuffled labels yields AUROC ~0.50–0.55 (bbox-cond) and ~0.53 (bbox-free Option D), while real-label training gives 0.81–0.92. The 0.25–0.40 AUROC gap above the permuted baseline is the non-circular signal.
+
+When used as a tiebreaker, the probe tells the policy "prefer rollouts that attend this way" — it never enters the reward magnitude, so the correctness ordering of rollouts is strictly preserved and there is no reward-hacking pathway through the probe.
 
 ### Why does the tiebreaker generalize when composite does not?
 
@@ -162,9 +166,9 @@ The tiebreaker never puts faith into the reward magnitude. Faith only disambigua
 
 The tiebreaker mechanism uses only *ordinal* information from the probe — whether rollout A is more grounded than rollout B. A logistic regressor captures linear separability in attention-feature space, which is sufficient for this ordering. Deep probes would require more training data than we have for in-session feature collection and carry higher variance on a small calibration set.
 
-### `drop_unformatted` = true is required
+### On `drop_unformatted`
 
-Without format gating, probe conditions collapse (e.g., corrprobe crashed to 0.233 val F1 in epoch 2 of prior experiments). With gating, both conditions reach equivalent in-distribution accuracy. Format-learning gradient dominates early training; `drop_unformatted` isolates the probe's contribution.
+The main sweep reported here uses `drop_unformatted=true` — unformatted rollouts are excluded from the gradient. This was originally needed to prevent early-training collapse in weak-probe conditions. Nodrop variants (unformatted rollouts kept in-batch with format_reward=0) are running now and behave normally; the comparison between drop and nodrop will be filled in when those finish.
 
 ## Reproduction
 
