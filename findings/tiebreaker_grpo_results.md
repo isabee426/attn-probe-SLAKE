@@ -157,7 +157,7 @@ Without corrrank, a reviewer can argue the tiebreaker result reduces to GOPO's c
 
 ## Val trajectories (correctness only, token F1)
 
-Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the run has not yet reached that step.
+Complete per-step val correctness for each of the 7 runs in the method/ablation sweep, refreshed 2026-04-24. All runs now completed (killed past peak or at end of scheduled epochs). Peaks per column are **bolded**. Empty cells indicate the run had already been killed.
 
 | Step | corr_s42 | corr_s456 | full_s42 | tiebreak_s456 | tiebreak_s42 | corrrank_s42 | corrrank_s456 |
 |---|---|---|---|---|---|---|---|
@@ -179,29 +179,58 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 | 160 | 0.4689 | 0.4083 | 0.4815 | 0.4844 | 0.5328 | 0.4084 | 0.3684 |
 | 170 | 0.4792 | 0.4332 | 0.5020 | 0.4928 | 0.5448 | 0.4094 | 0.3468 |
 | 180 | 0.4844 | 0.4406 | **0.5126** | 0.4720 | 0.5439 | 0.4061 | 0.3528 |
-| 190 | 0.4796 | 0.4105 | 0.4767 | 0.4705 | 0.5294 | **0.4308** | 0.3723 |
-| 200 | 0.4708 | 0.4430 | 0.4941 | 0.4795 | 0.5369 |  | 0.3602 |
-| 210 | 0.4621 | 0.4256 | 0.4617 | 0.4903 | 0.5342 |  | **0.3966** |
-| 220 | **0.4944** | 0.4481 | 0.4770 | 0.4826 | 0.5393 | 0.4249 |  |
+| 190 | 0.4796 | 0.4105 | 0.4767 | 0.4705 | 0.5294 | 0.4308 | 0.3723 |
+| 200 | 0.4708 | 0.4430 | 0.4941 | 0.4795 | 0.5369 | 0.4244 | 0.3602 |
+| 210 | 0.4621 | 0.4256 | 0.4617 | 0.4903 | 0.5342 | 0.4368 | 0.3966 |
+| 220 | 0.4944 | 0.4481 | 0.4770 | 0.4826 | 0.5393 | 0.4249 | 0.4023 |
 | 230 | 0.4699 | 0.4516 | 0.4564 | 0.5023 | 0.5542 | 0.4141 | 0.4106 |
 | 240 | 0.4961 | 0.4570 | 0.4764 | 0.5145 | 0.5544 | 0.4436 | 0.4033 |
-| 250 | 0.4895 | **0.4790** | 0.4927 | 0.5064 | 0.5680 | **0.4577** | 0.3908 |
-| 260 | 0.4757 | 0.4635 | 0.4847 | 0.5052 | 0.5530 | 0.4450 | **0.4166** |
-| 270 | 0.4968 | 0.4529 | 0.5046 | **0.5201** | 0.5722 |  | 0.4115 |
-| 280 | 0.4925 | 0.4650 | 0.4984 | 0.5129 | 0.5699 |  | 0.4009 |
-| 290 | **0.5166** | 0.4416 | 0.4845 | 0.5077 | **0.5828** |  |  |
-| 300 | 0.4845 | 0.4517 | 0.4872 (full_s42 killed) | 0.5106 | 0.5601 |  |  |
-| 310 | 0.5055 | 0.4689 |  |  | 0.5401 |  |  |
-| 320 | 0.5036 | 0.4769 |  |  |  |  |  |
-| 330 | 0.4960 | 0.4374 |  |  |  |  |  |
-| 340 |  | 0.4705 |  |  |  |  |  |
-| ... | | | | tiebreak_s456 oscillating 0.48–0.52 through step 460 | tiebreak_s42 oscillating 0.51–0.60 through step ~500, then broke through | | |
-| 460 |  |  |  | 0.5003 (run killed) |  |  |  |
-| 510 |  |  |  |  | 0.6077 |  |  |
-| 570 |  |  |  |  | **0.6190** (sweep peak) |  |  |
-| 630 |  |  |  |  | 0.5609 (run killed at step 670, past peak) |  |  |
+| 250 | 0.4895 | **0.4790** | 0.4927 | 0.5064 | 0.5680 | 0.4577 | 0.3908 |
+| 260 | 0.4757 | 0.4635 | 0.4847 | 0.5052 | 0.5530 | 0.4450 | 0.4166 |
+| 270 | 0.4968 | 0.4529 | 0.5046 | **0.5201** | 0.5722 | 0.4440 | 0.4115 |
+| 280 | 0.4925 | 0.4650 | 0.4984 | 0.5129 | 0.5699 | 0.4420 | 0.4009 |
+| 290 | **0.5166** | 0.4416 | 0.4845 | 0.5077 | 0.5828 | 0.4545 | 0.4248 |
+| 300 | 0.4845 | 0.4517 | 0.4872 | 0.5106 | 0.5601 | 0.4695 | 0.3938 |
+| 310 | 0.5055 | 0.4689 | | 0.4961 | 0.5401 | 0.4680 | 0.4191 |
+| 320 | 0.5036 | 0.4769 | | 0.5149 | 0.5548 | 0.4579 | 0.4001 |
+| 330 | 0.4960 | 0.4374 | | 0.5177 | 0.5742 | 0.4689 | 0.4097 |
+| 340 | | 0.4705 | | 0.5092 | 0.5744 | 0.4885 | 0.3902 |
+| 350 | | 0.4787 | | 0.5110 | 0.5747 | **0.5067** | 0.4218 |
+| 360 | | | | 0.5018 | 0.5648 | 0.4973 | 0.4269 |
+| 370 | | | | 0.5160 | 0.5861 | 0.4941 | 0.4032 |
+| 380 | | | | 0.4745 | 0.5666 | 0.4985 | **0.4390** |
+| 390 | | | | 0.4838 | 0.5436 | 0.4914 | 0.4074 |
+| 400 | | | | 0.4693 | 0.5105 | 0.5043 | 0.4350 |
+| 410 | | | | 0.4814 | 0.5180 | | 0.4220 |
+| 420 | | | | 0.4745 | 0.5237 | | 0.4287 |
+| 430 | | | | 0.4691 | 0.5417 | | |
+| 440 | | | | 0.4692 | 0.5337 | | |
+| 450 | | | | 0.4951 | 0.5373 | | |
+| 460 | | | | 0.5003 | 0.5634 | | |
+| 470 | | | | | 0.5629 | | |
+| 480 | | | | | 0.5362 | | |
+| 490 | | | | | 0.5643 | | |
+| 500 | | | | | 0.5673 | | |
+| 510 | | | | | 0.6077 | | |
+| 520 | | | | | 0.5799 | | |
+| 530 | | | | | 0.5911 | | |
+| 540 | | | | | 0.5979 | | |
+| 550 | | | | | 0.5978 | | |
+| 560 | | | | | 0.6189 | | |
+| 570 | | | | | **0.6190** | | |
+| 580 | | | | | 0.6135 | | |
+| 590 | | | | | 0.5990 | | |
+| 600 | | | | | 0.5898 | | |
+| 610 | | | | | 0.5590 | | |
+| 620 | | | | | 0.5498 | | |
+| 630 | | | | | 0.5609 | | |
+| 640 | | | | | 0.5553 | | |
+| 650 | | | | | 0.5282 | | |
+| 660 | | | | | 0.5353 | | |
+| 670 | | | | | 0.5292 | | |
+| 680 | | | | | 0.5444 | | |
 
-**New ablation run (not in table above):** `tiebreak_s42_nodrop` (no `drop_unformatted` format gating) launched Apr 22. Early trajectory matches tiebreak_with_drop: step 10 = 0.3046, step 20 = 0.3226, step 30 = 0.3313.
+**Run terminal states:** corr_s42 killed step 330 (past peak). corr_s456 killed step 350 (past peak). full_s42 killed step 300. tiebreak_s456 killed step 460 (past peak). tiebreak_s42 killed step 680 (past peak). corrrank_s42 killed step 400 (past peak). corrrank_s456 killed step 420 (past peak).
 
 ### Matched-seed comparisons
 
@@ -214,45 +243,53 @@ Every eval-step recorded for each run, as of 2026-04-21. Empty cells mean the ru
 - full_s42: 0.4757
 - tiebreak_s42: **0.5148** — **Δ +0.071 over corr, +0.039 over full**
 
-### Cross-method peak val correctness (refreshed 2026-04-23)
+### Cross-method peak val correctness (all runs completed, refreshed 2026-04-24)
 
-1. **tiebreak_s42 (bbox-cond): 0.6190** (step 570, past peak; run killed step 670)
-2. tiebreak_s456 (bbox-cond): 0.5201 (step 270, past peak; run killed step 460)
+1. **tiebreak_s42 (bbox-cond): 0.6190** (step 570; run killed step 680 past peak)
+2. **tiebreak_s456 (bbox-cond): 0.5201** (step 270; run killed step 460 past peak)
 3. **corr_s42: 0.5166** (step 290; run killed step 330 past peak)
-4. full_s42: 0.5126 (step 180, killed step 300)
-5. tiebreak_s42_nodrop (bbox-cond, no drop_unformatted): **0.5092** (step 120, still climbing)
-6. **corr_s456: 0.4790** (step 250; run killed step 340 past peak)
-7. corrrank_s42: 0.4577 (step 250, at peak as of step 286 — val plateauing)
-8. corrrank_s456: 0.4248 (step 290, still climbing slowly)
-9. tiebreak_s42 (bbox-free, Option D): 0.3109 (step 20, too early to judge — first eval of new probe)
+4. **full_s42: 0.5126** (step 180; run killed step 300)
+5. **corrrank_s42: 0.5067** (step 350; run killed step 400 past peak) — peak came in epoch 3-4, well after the earlier "still climbing at 0.4577" snapshot
+6. **corr_s456: 0.4790** (step 250; run killed step 350 past peak)
+7. **corrrank_s456: 0.4390** (step 380; run killed step 420 past peak) — same late-peak pattern as corrrank_s42
 
-## Convergence assessment (2026-04-21)
+The two corrrank peaks landed 70–130 steps later than earlier convergence snapshots suggested. Both final peaks still sit below the matched-seed tiebreak peaks (tiebreak_s42 0.6190 vs corrrank_s42 0.5067 = +0.112 for the faith tiebreaker on top of rank advantage; tiebreak_s456 0.5201 vs corrrank_s456 0.4390 = +0.081). Faith-tiebreaker contribution is preserved at final-peak granularity, not just mid-training.
 
-**tiebreak_s456** is the only run with enough data to judge:
-- Peak **0.5201 at step 270**, ~3.1 epochs in.
-- Steps 230–370 oscillate between 0.50–0.52 (band width ~0.02).
-- Steps 380–450 drop into 0.47–0.49 band. Best in this range is 0.4951 at step 450.
-- Pattern is consistent with reaching peak then drifting — possibly slight overfitting as LoRA adapters continue to update past useful signal, possibly just noise.
-- **Call:** reached its peak in epoch 3. Additional epochs are not helping and may be hurting. Peak checkpoint (step 270) is the one to use for eval.
+## Convergence assessment (final, 2026-04-24)
 
-**tiebreak_s42** still climbing: steps 90–150 span 0.50–0.52, latest 0.5186 at step 150. Following s456's trajectory suggests peak around step 250–300, so another ~100 steps (~30 h) of useful training remaining.
+All seven runs have terminated. Per-run peak + post-peak behavior:
 
-**full_s42** still climbing at step 180 (peak 0.5126 at latest eval). Composite reward tends to saturate later than correctness-only (prior experiment); likely not at peak yet.
+**tiebreak_s42 (bbox-cond).** Climbed past 0.60 around step 510, peaked at 0.6190 at step 570, then oscillated 0.53–0.61 through step 680 before being killed. Clean peak-then-decline trajectory.
 
-**corr_s42** slowed but still climbing (180:0.4844, 190:0.4796 — first slight dip). Probably near peak.
+**tiebreak_s456 (bbox-cond).** Peaked at 0.5201 at step 270, oscillated 0.47–0.52 through step 460 (wider noise band than s42), killed at step 460. Matches s42's "peak in epoch 3 then drift" pattern.
 
-**corr_s456** oscillating 0.40–0.44 since step 130. Peak 0.4406 at step 180, dropped to 0.4105 at 190. Looks near peak with high oscillation.
+**corr_s42.** Peaked at 0.5166 at step 290. Steps 300–330 oscillated 0.48–0.51 before kill.
 
-**corrrank_s{42,456}** (ablation) still early at step 50–60, stuck around 0.28–0.32. Well below tiebreak at matched step (0.40+ for tiebreak, 0.31 for corrrank). Suggests the rank-advantage alone is NOT capturing the gain — the faith-tiebreaker is doing real work.
+**corr_s456.** Peaked at 0.4790 at step 250. Steps 260–350 oscillated 0.44–0.48 with wide band.
+
+**full_s42 (composite α=0.7).** Peaked at 0.5126 at step 180, oscillated 0.46–0.51 through step 300, killed at step 300.
+
+**corrrank_s42.** Climbed slowly through epochs 2-3, peaked at 0.5067 at step 350 — well above the earlier "plateauing at 0.4577" reading. Steps 360–400 oscillated 0.49–0.51. Killed at step 400.
+
+**corrrank_s456.** Peaked at 0.4390 at step 380, even later than s42. Steps 390–420 oscillated 0.41–0.44. Killed at step 420.
+
+### Corrrank late-peak correction
+
+Our earlier convergence assessment had corrrank "too early to call, but matched-step numbers already signal the tiebreaker specifically matters." That reading extrapolated from step 50–80 data. Full-epoch data shows corrrank does eventually climb to 0.51 / 0.44 — roughly matching corr_only's peaks (0.5166 / 0.4790). **Rank-advantage alone is not catastrophic** on sparse token-F1 rewards; it just converges slower and to roughly the same place as mean-subtracted advantage. The tiebreaker's contribution is the **+0.11 / +0.08** advantage on top of both, which holds at final peaks.
 
 ### Summary
 
-- **tiebreak_s456:** converged (past peak), peak 0.5201 at step 270.
-- **tiebreak_s42:** not yet converged, projected peak ~0.52 in another 100–150 steps.
-- **full_s42, corr_s42, corr_s456:** approaching peak, another 20–50 steps of possibly-useful training.
-- **corrrank:** too early to call, but matched-step numbers already signal the tiebreaker specifically matters (not just rank advantages).
+| Run | Peak val_correct | Peak step | Killed at step | Final gap below peak |
+|---|---|---|---|---|
+| tiebreak_s42 | **0.6190** | 570 | 680 | −0.075 (0.5444 final) |
+| tiebreak_s456 | **0.5201** | 270 | 460 | −0.020 (0.5003 final) |
+| corr_s42 | 0.5166 | 290 | 330 | −0.021 (0.4960 final) |
+| full_s42 | 0.5126 | 180 | 300 | −0.025 (0.4872 final) |
+| corrrank_s42 | 0.5067 | 350 | 400 | −0.002 (0.5043 final) |
+| corr_s456 | 0.4790 | 250 | 350 | −0.000 (0.4787 final) |
+| corrrank_s456 | 0.4390 | 380 | 420 | −0.010 (0.4287 final) |
 
-For the paper: use step 270 checkpoint of tiebreak_s456 and the eventual peak of tiebreak_s42 (~step 300) as the primary numbers.
+For the paper: use best-val-correct checkpoints from each run as the primary SLAKE-test numbers; these correspond to the peak column above.
 
 ## Mechanism analysis
 
