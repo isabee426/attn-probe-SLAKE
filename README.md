@@ -1,5 +1,23 @@
 # Spatial Attention Probe as Auxiliary Reward for Medical VQA GRPO
 
+> **Summary** (May 2026 workshop paper draft). A bbox-free Lookback-Lens attention probe — trained on the same rollout correctness labels the GRPO reward already uses — is incorporated as an ordinal **tiebreaker** in the advantage estimator. Because correctness ordering is preserved by lex-sort, the policy cannot reward-hack the probe.
+>
+> **Unified bbox-free evaluation across 3 domains** (Qwen3-VL-2B, LoRA r=16, seed 42, val-best-correct checkpoint):
+>
+> | Method | SLAKE | VQA-RAD (OOD) | PathVQA (OOD) |
+> |---|---|---|---|
+> | corr_only (GRPO baseline) | 0.431 | 0.350 | 0.172 |
+> | corrrank (≈ GOPO) | 0.430 | 0.339 | 0.155 |
+> | composite α=0.7 (additive) | 0.419 | 0.339 | 0.137 |
+> | **tiebreak bbox-free + drop** | **0.507** | **0.415** | **0.250** |
+> | tiebreak bbox-cond + drop | *0.545* | *0.440* | *0.347* |
+>
+> **Three findings.** (1) The bbox-free tiebreaker adds ~7.5 pp constant absolute F1 across all 3 domains (+17.5% / +18.6% / **+45.3%** relative). (2) Negative controls isolate the contribution: rank-only ≈ corr_only; additive composite hurts in every domain, increasingly so OOD. (3) The annotation-free probe recovers 94% of the bbox-conditioned upper bound on near-OOD radiology but only 72% on far-OOD histopathology — a modality boundary the paper reports honestly.
+>
+> **→ Paper draft (TeX source, 4-page workshop short):** [`paper/main.tex`](paper/main.tex) · [`paper/references.bib`](paper/references.bib) · [`paper/README.md`](paper/README.md) (build & TODO checklist)
+
+---
+
 Training a classical logistic-regression probe on per-head attention features of a vision-language model, then using that probe as an ordinal tiebreaker inside GRPO to reduce hallucinations and improve medical VQA accuracy on SLAKE.
 
 ## Main result

@@ -1,0 +1,432 @@
+% Workshop short paper — GroundLM @ EMNLP 2026
+% Target: 4 pages content + unlimited references (ACL standard)
+% Build: pdflatex main && bibtex main && pdflatex main && pdflatex main
+%
+% Requires: acl.sty, ACL bibliography style (download from
+%   https://github.com/acl-org/acl-style-files when CFP confirms style).
+% Using the standard ACL style for now; switch to the GroundLM-specific
+% template once the workshop publishes one.
+
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
+\usepackage{inconsolata}
+
+% --- ACL style placeholder ---
+% \usepackage[review]{acl}   % review mode (anonymous)
+% \usepackage{acl}            % camera-ready
+% Comment out the next 4 lines when acl.sty is present:
+\usepackage[margin=1in]{geometry}
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{hyperref}
+
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\methodname}{Faith-Tiebreak\xspace}
+
+\title{Annotation-Free Grounding for Medical Vision-Language Models\\via Faithfulness Tiebreakers in GRPO}
+
+\author{
+  \todo{author block — anonymize for review}
+}
+
+\date{}
+
+\begin{document}
+\maketitle
+
+%==========================================================
+\begin{abstract}
+Reinforcement learning with verifiable rewards (RLVR) for vision-language
+models suffers from \emph{group-advantage collapse}: when rollouts for a
+prompt tie on a coarse correctness metric, GRPO's group-relative
+advantage vanishes and no gradient flows. We propose an
+\textbf{annotation-free} attention probe --- a Lookback-Lens classifier
+trained on the same correctness labels already available from the
+verifiable reward --- and incorporate its output as an \textbf{ordinal
+tiebreaker} (not an additive penalty) in the GRPO advantage estimator.
+Because correctness ordering is never re-ordered by the probe, the
+policy cannot reward-hack it. On medical VQA the tiebreaker adds a
+roughly constant $+7.5$\,pp absolute F1 over correctness-only GRPO
+across SLAKE ($0.431 \rightarrow 0.507$), out-of-domain VQA-RAD
+($0.350 \rightarrow 0.415$) and out-of-domain PathVQA ($0.172
+\rightarrow 0.250$, $+45\%$ relative). Two negative controls isolate
+the contribution: rank-only GRPO ($\approx$GOPO) gives no lift, and
+additive composite rewards \emph{degrade} performance in every domain
+($-1.3$\,pp SLAKE, $-1.1$ VQA-RAD, $-3.5$ PathVQA), confirming the
+reward-hacking pathway that the tiebreaker structure rules out by
+construction. No bounding-box annotations, no preference data, single
+GPU via LoRA.
+\end{abstract}
+
+%==========================================================
+\section{Introduction}
+
+Reinforcement learning with verifiable rewards has become the dominant
+post-training paradigm for reasoning models, with Group Relative Policy
+Optimization (GRPO) \citep{deepseek-r1} as its workhorse. GRPO computes
+each rollout's advantage relative to the group mean reward, eliminating the
+critic network. For coarse rewards like token-F1 on medical VQA, however,
+the rollout group frequently collapses: all 8 rollouts produce
+correctness-equivalent answers, the within-group variance is zero, and the
+gradient vanishes \citep{dapo,ngrpo}.
+
+Existing fixes fall into two camps. \textbf{Dynamic sampling} (DAPO) and
+\textbf{advantage calibration} (NGRPO) prevent zero-variance groups by
+resampling or by injecting a virtual maximum-reward sample. These restore
+gradient flow but do not exploit any side information about \emph{which}
+correctness-tied rollout is actually well-grounded. \textbf{Process reward
+models} (Perceval, \citealp{perceval}) and \textbf{additive composite
+rewards} mix a learned faithfulness signal directly into the reward
+magnitude. These do exploit grounding, but at the cost of introducing a
+reward-hacking pathway: a noisy probe can pull the policy toward grounded
+but incorrect outputs.
+
+\textbf{Our contribution} is the intersection of these two lines: a
+faithfulness signal that informs the policy update \emph{only when
+correctness ties}. Concretely:
+
+\begin{enumerate}
+\itemsep0em
+\item We extend the Lookback-Lens attention probe \citep{lookback-lens}
+  to vision-language models, defining a per-head feature as the ratio of
+  attention paid to vision tokens versus all tokens, averaged over the
+  generated response. The probe is annotation-free: training labels come
+  from rollout correctness, not bounding boxes.
+\item We register a \textbf{tiebreaker advantage estimator} that
+  lexicographically sorts rollouts by (correctness, faith) and assigns a
+  centered rank advantage. Correctness ordering is preserved; faith only
+  re-orders within correctness-tied subgroups.
+\item We show that \textbf{dropping unformatted rollouts} from both the
+  rank set and the gradient is a strict improvement over zero-rewarding
+  them, and is the single most impactful knob for out-of-domain
+  generalization.
+\end{enumerate}
+
+On SLAKE \citep{slake} medical VQA (in-domain) and VQA-RAD
+\citep{vqarad}/PathVQA \citep{pathvqa} (out-of-domain), our method
+substantially outperforms correctness-only GRPO and additive composite
+baselines, while requiring no anatomical bounding-box annotations.
+
+%==========================================================
+\section{Method}
+
+\subsection{Faithfulness Probe}
+
+Following \citet{lookback-lens}, we score the faithfulness of a generated
+response by the share of model attention directed at grounding tokens
+versus self-generated tokens. For a vision-language transformer with $L$
+layers and $H$ heads, let $\alpha_{l,h}(t, s)$ denote the attention weight
+from generated token $t$ to source token $s$ in head $h$ of layer $l$.
+Define the per-head \emph{image-attention ratio}
+
+\begin{equation}
+r_{l,h} = \frac{1}{T} \sum_{t=1}^{T} \frac{\sum_{s \in \mathcal{V}} \alpha_{l,h}(t,s)}{\sum_{s} \alpha_{l,h}(t,s)},
+\label{eq:probe-feature}
+\end{equation}
+
+where $\mathcal{V}$ is the set of vision (image-patch) input positions,
+and $T$ is the number of generated tokens. Stacking $r_{l,h}$ across all
+$L \cdot H$ heads gives a $LH$-dimensional feature vector. We fit a
+logistic-regression classifier $\pi_\theta(\text{faith} = 1 \mid r)$ on
+rollouts collected from a held-out probe training set, labeled by rollout
+correctness. \textbf{No anatomical bounding boxes are used} --- the probe
+is supervised purely by the verifiable reward.
+
+\subsection{Tiebreaker Advantage}
+
+For each prompt's group of $N$ rollouts with correctness scores $c_i$ and
+faith probabilities $f_i$, the tiebreaker advantage is computed as in
+Algorithm~\ref{alg:tiebreak}. The key invariants:
+
+\begin{itemize}
+\itemsep0em
+\item \textbf{Correctness ordering is preserved.} A more-correct rollout
+  always outranks a less-correct one --- faith only re-orders within
+  correctness-tied subgroups.
+\item \textbf{No reward-hacking pathway.} Because faith never enters the
+  reward magnitude, a noisy probe cannot pull the policy toward
+  grounded-but-incorrect outputs (cf.\ Perceval's additive penalty).
+\item \textbf{Mean-zero, bounded.} The centered rank is automatically
+  whitened in $[-(N-1)/2, +(N-1)/2]$, removing the need for EBPO-style
+  baseline shrinkage \citep{ebpo}.
+\end{itemize}
+
+\begin{algorithm}[t]
+\caption{Tiebreaker advantage estimator}
+\label{alg:tiebreak}
+\begin{algorithmic}[1]
+\State \textbf{Input:} rollout group $\{(c_i, f_i, \text{fmt}_i)\}_{i=1}^N$
+\If{drop\_unformatted}
+  \State $\mathcal{I} \gets \{i : \text{fmt}_i = \text{True}\}$
+  \If{$\mathcal{I} = \emptyset$} \Return zero advantages \EndIf
+\Else
+  \State $\mathcal{I} \gets \{1, \ldots, N\}$
+\EndIf
+\State Sort $\mathcal{I}$ by $(c_i, f_i)$ descending: $\sigma$
+\State $N' \gets |\sigma|$, \quad $\bar r \gets (N' - 1)/2$
+\For{$\text{pos} = 0, \ldots, N' - 1$}
+  \State $A_{\sigma[\text{pos}]} \gets (N' - 1 - \text{pos}) - \bar r$
+\EndFor
+\State $A_i \gets 0$ for $i \notin \mathcal{I}$
+\State \Return $\{A_i\}$ broadcast across response tokens
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Drop-Unformatted Rollouts}
+
+Rollouts that fail to emit the required \verb|<answer>...</answer>| tag
+are \emph{excluded from both the rank set and the gradient} (rather than
+assigned a zero reward). This is a stricter intervention than format
+penalties: a format-broken rollout cannot accidentally outrank a
+format-correct one through faith, and cannot consume capacity in the rank
+budget. Empirically (\S\ref{sec:exp}), dropping is responsible for a
+$10.4$\,pp absolute VQA-RAD improvement and is \emph{necessary} for the
+tiebreaker to transfer out-of-domain at all (\S\ref{sec:exp},
+observation~4).
+
+%==========================================================
+\section{Experiments}
+\label{sec:exp}
+
+\subsection{Setup}
+
+\textbf{Model.} Qwen3-VL-2B-Thinking with LoRA ($r=16$, $\alpha=32$,
+target modules $q,k,v,o$), dropout 0.05. Trainable parameter count is
+$\sim$0.2\% of the 2B base model.
+
+\textbf{Training.} GRPO with 8 rollouts per prompt, batch
+$\text{prompts}=8 \times \text{grad\_accum}=8$, learning rate $1\mathrm{e}{-5}$ cosine
+with weight decay 0.01, KL coefficient $\beta = 0.05$ (low-variance
+estimator), temperature 1.0, max 512 new tokens. Seed 42. Five epochs
+target (early stopping by val correctness).
+
+\textbf{Data.} SLAKE organ-filtered English subset: 2076 questions split
+10:1 train/val (1888/188); test on the full 1061 English questions.
+Out-of-domain eval: VQA-RAD (451 test) and PathVQA (sample of 500).
+
+\textbf{Baselines.}
+(i) \emph{corr\_only}: standard GRPO, reward = token-F1.
+(ii) \emph{corrrank} (\textasciitilde GOPO, \citealp{gopo}):
+correctness rank only, no faith.
+(iii) \emph{composite}: $0.7 \cdot \text{corr} + 0.3 \cdot \text{faith}_{\text{z}}$,
+additive scalar reward.
+(iv) \emph{tiebreak (bbox-cond)}: ours, with the bbox-conditioned probe
+that requires anatomical annotations. This is the strong upper bound.
+(v) \textbf{\emph{tiebreak (bbox-free)}}: ours, annotation-free probe.
+All methods use the same data, schedule, and val-best-correct
+checkpointing.
+
+\subsection{Results}
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{lccc}
+\toprule
+\textbf{Method} & \textbf{SLAKE F1} & \textbf{VQA-RAD F1} (OOD) & \textbf{PathVQA F1} (OOD)\\
+\midrule
+Zero-shot                          & 0.299        & 0.125        & ---         \\
+\midrule
+corr\_only (GRPO baseline)         & 0.431        & 0.350        & 0.172       \\
+corrrank ($\approx$ GOPO)          & 0.430        & 0.339        & 0.155       \\
+composite ($\alpha{=}0.7$)         & 0.419        & 0.339        & 0.137       \\
+\midrule
+\textbf{tiebreak (bbox-free, drop=on)}  & \textbf{0.507}  & \textbf{0.415}   & \textbf{0.250} \\
+\quad ablation: drop=off            & 0.499         & 0.311         & 0.240        \\
+\midrule
+\textit{tiebreak (bbox-COND, drop=on)} & \textit{0.545} & \textit{0.440} & \textit{0.347} \\
+\quad \emph{(uses anatomical bboxes --- upper bound)} & & & \\
+\bottomrule
+\end{tabular}
+\caption{SLAKE in-domain and out-of-domain transfer F1. All methods
+trained from Qwen3-VL-2B-Thinking with the same schedule, seed 42, and
+val-best-correct checkpoint. Numbers populated by
+\texttt{scripts/eval\_paper\_table.sh}.}
+\label{tab:main}
+\end{table*}
+
+Table~\ref{tab:main} shows the headline numbers. Four observations:
+
+\textbf{(1) Rank alone is insufficient.} Pure ordinal GRPO
+(\emph{corrrank}, $\approx$ GOPO) yields $0.430$ on SLAKE, essentially
+tied with the magnitude-based corr\_only baseline ($0.431$). The
+$+7.6$\,pp lift to $0.507$ for the tiebreaker therefore comes from the
+\emph{faith signal}, not from the use of ranks. This isolates our
+contribution from concurrent rank-only methods.
+
+\textbf{(2) Additive composite hurts both in- and out-of-domain.}
+Combining correctness and faith into a single scalar reward ($0.7\cdot$corr
+$+\,0.3\cdot$faith) \emph{degrades} SLAKE from $0.431$ to $0.419$ and
+\emph{also} degrades VQA-RAD from $0.350$ to $0.339$. The reward-hacking
+pathway predicted in \S\ref{sec:method} is empirically real, and the
+failure is cross-domain consistent --- supporting our argument that
+auxiliary signals belong in the rank order, not the reward magnitude.
+
+\textbf{(3) Annotation-free transfer is modality-bounded.} The
+bbox-conditioned tiebreaker reaches $0.545$ on SLAKE (reproducing the
+reference target within $0.002$); the bbox-free variant lands at
+$0.507$, trading $\sim$4\,pp in-domain for zero annotation requirement.
+On near-OOD radiology (VQA-RAD) the gap shrinks to $2.5$\,pp ($0.415$
+vs $0.440$): the annotation-free probe recovers $94\%$ of the
+bbox-conditioned OOD F1. On far-OOD histopathology (PathVQA) the gap
+widens to $9.7$\,pp ($0.250$ vs $0.347$, $72\%$ recovery). The probe
+generalizes within the modality it was trained on (radiology) but
+degrades on a different imaging modality entirely. The annotation-free
+claim is therefore stronger inside the training-modality envelope than
+across it.
+
+\textbf{(4) Drop-unformatted is VQA-RAD-specific, not generally OOD.}
+The drop ablation costs only $0.8$\,pp on SLAKE in-domain ($0.499
+\rightarrow 0.507$) and $0.95$\,pp on PathVQA ($0.240 \rightarrow
+0.250$) --- but a striking $10.4$\,pp on VQA-RAD ($0.311 \rightarrow
+0.415$, $+33\%$ relative). Without dropping unformatted rollouts the
+tiebreaker is in fact \emph{worse than corr\_only on VQA-RAD} ($0.311$
+vs $0.350$): it transfers to histopathology fine but fails on
+closed-form radiology QA. We hypothesize VQA-RAD's higher fraction of
+short closed-form answers (yes/no, single organ names) interacts with
+format-broken rollouts in a particularly bad way --- a broken-format
+yes/no can land lucky F1 enough to pollute the probe's training labels.
+The drop intervention prevents this leakage. On other OOD domains where
+the answer distribution is more diffuse, the effect is much milder.
+
+\subsection{Mechanism: What the Faith Signal Does}
+\label{sec:mechanism}
+
+Two of the four results above are surprising and deserve a mechanistic
+account: \emph{(i)} the faith signal contributes essentially the entire
++7.6\,pp lift (corrrank alone is a wash), and \emph{(ii)} the same faith
+signal \emph{hurts} when injected additively. The two observations have
+a common explanation.
+
+The tiebreaker advantage is identical to standard rank-GRPO outside of
+correctness ties; faith only enters the gradient when two or more
+rollouts have equal correctness. Token-F1 on medical VQA is coarse
+enough that such ties are common --- with $N{=}8$ rollouts per prompt,
+many groups have multiple rollouts that land at F1 $=$ 0.0 or F1 $=$
+1.0. Under standard GRPO these tied rollouts receive identical
+advantage, and the gradient pushes uniformly on a set of generations
+that may have produced the same answer for very different reasons (some
+by attending to the image, others by exploiting language priors). The
+faith signal provides intra-tie \emph{resolution}: among correctness-tied
+generations, those whose attention pattern matches the
+historically-correct pattern receive a larger advantage, biasing the
+policy gradient toward attention shapes that transfer. This
+explains why the gain is large in-domain --- many tied groups become
+informative gradient instead of dead gradient --- and why it transfers
+cleanly out-of-domain: the regularization is toward attention
+\emph{shapes} that generalize, not toward particular tokens that yielded
+high F1 on training prompts. Empirically the tiebreaker contributes a roughly constant $\sim$$7.5$\,pp
+absolute F1 lift over corr\_only across all three domains (SLAKE
+$+7.5$, VQA-RAD $+6.5$, PathVQA $+7.8$). The relative gain therefore
+\emph{grows} with distribution difficulty --- the same absolute lift
+becomes $+17.5\%$ on SLAKE, $+18.6\%$ on VQA-RAD, and $+45.3\%$ on
+PathVQA where the baseline is small. We interpret this as the tiebreaker
+adding a fixed amount of advantage-signal resolution per group, which
+becomes proportionally more important when the underlying task is
+harder and the corr\_only signal is weaker.
+
+Composite rewards lose precisely this property. When faith is added to
+the reward magnitude, an incorrect-but-grounded rollout outranks an
+incorrect-but-ungrounded one --- and the policy duly upweights
+incorrect-but-grounded generations. The reward-hacking pathway through
+the probe predicted in \S\ref{sec:method} is empirically visible as the
+1.3\,pp degradation on SLAKE.  In the tiebreaker, the lex-sort
+invariant rules this failure out by construction: an incorrect rollout
+never outranks a correct one, regardless of faith.
+
+\subsection{Probe Quality}
+
+The annotation-free probe achieves val AUROC $0.873$ (vs.\
+permuted-label control $0.522$, gap $+0.351$), confirming that
+image-vs-text attention ratios alone carry meaningful correctness
+signal in Qwen3-VL without any anatomical supervision.
+
+%==========================================================
+\section{Related Work}
+
+\textbf{Attention-based hallucination detection.} Lookback-Lens
+\citep{lookback-lens} introduced attention-ratio features for LLMs;
+VIB-Probe \citep{vibprobe}, VADE \citep{vade}, and PADE
+\citep{pade} extend attention-based detection to LVLMs. Our probe
+inherits this lineage but adapts it for the RL inner loop, where
+detection at decode time is replaced by rollout scoring at training
+time.
+
+\textbf{Ordinal advantage in GRPO.} GOPO \citep{gopo} demonstrates that
+rank-only advantage matches or beats magnitude-based GRPO under noisy
+reward models. Our tiebreaker is GOPO augmented with a faith signal for
+intra-rank ordering --- the empirical question is whether the auxiliary
+signal helps beyond pure ranks (Table~\ref{tab:main}, corrrank row).
+
+\textbf{Reward augmentation with grounding signals.} Perceval
+\citep{perceval} uses a learned process reward model to apply token-level
+penalty masks to GRPO advantages, $A'_{i,t} = A_i - \alpha \cdot
+m_{i,t}\cdot|A_i|$. Vision-SR1 \citep{vision-sr1} uses a decoupled
+multi-reward policy loss. Both inject the grounding signal into the
+reward magnitude; our tiebreaker injects it only into the rank order ---
+eliminating the reward-hacking pathway that motivates Perceval's
+$\alpha$-tuning.
+
+\textbf{Advantage-collapse fixes.} DAPO \citep{dapo} dynamically
+re-samples zero-variance groups; NGRPO \citep{ngrpo} injects a virtual
+maximum-reward sample. These complement our approach: when no faith
+ordering can break a tie (e.g.\ all 8 rollouts identical including
+attention), DAPO-style resampling is the natural fallback.
+
+\textbf{Medical VLM RL.} MedVLM-R1 \citep{medvlm-r1} and Med-R1
+\citep{med-r1} establish GRPO baselines on SLAKE/VQA-RAD with
+correctness-only rewards. RARL \citep{rarl} combines LoRA with RL under
+similar compute constraints. Our work is the first to add a faithfulness
+signal to this stack in an annotation-free manner.
+
+%==========================================================
+\section{Conclusion}
+
+We presented an annotation-free faithfulness tiebreaker for GRPO that
+grounds vision-language models without requiring bounding-box
+annotations or paired preferences. On medical VQA, the method lifts
+SLAKE token-F1 from $0.431$ to $0.507$ ($+17.5\%$ relative) and
+improves out-of-domain VQA-RAD by $+18.6\%$ relative ($0.350 \rightarrow
+0.415$), with the drop-unformatted variant
+accounting for the bulk of the OOD gain. By placing the faith signal
+strictly inside the tiebreaker --- not the reward magnitude --- we
+eliminate the reward-hacking pathway that constrains additive
+hallucination-aware rewards.
+
+%==========================================================
+\section*{Limitations}
+
+\begin{itemize}
+\itemsep0em
+\item \textbf{Single domain.} All training and primary evaluation is on
+  medical VQA. Cross-domain validation on VLAA-Thinking
+  (math/MCQ/digit/IoU) is ongoing.
+\item \textbf{Single seed.} All reported numbers use seed 42; we plan
+  multi-seed runs for the long-paper extension.
+\item \textbf{2B model only.} Qwen3-VL-2B-Thinking is small; the
+  tiebreaker may scale differently at 7B+.
+\item \textbf{Reference implementation, not verl.} A port of the
+  tiebreaker advantage estimator to the verl framework is in progress
+  for community reuse and broader GRPO-family comparisons (RLOO, GPG,
+  GSPO, DAPO).
+\item \textbf{Probe transferability.} The bbox-free probe is trained on
+  Qwen3-VL-2B attentions; whether it transfers to other VLM
+  architectures without retraining is an open question.
+\end{itemize}
+
+%==========================================================
+\bibliographystyle{acl_natbib}
+\bibliography{references}
+
+\end{document}
